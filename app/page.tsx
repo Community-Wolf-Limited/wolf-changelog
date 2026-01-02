@@ -1,37 +1,20 @@
-import { docs, meta } from "@/.source"
-import { loader } from "fumadocs-core/source"
-import { createMDXSource } from "fumadocs-mdx"
+import { Suspense } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { useMemo } from "react"
+import { ChangelogTabs } from "@/components/changelog-tabs"
+import {
+  discoverProducts,
+  getChangelogsByProduct,
+} from "@/lib/changelog"
 import { formatDate } from "@/lib/utils"
 
-const source = loader({
-  baseUrl: "/docs",
-  source: createMDXSource(docs, meta),
-})
-
-interface ChangelogData {
-  title: string
-  date: string
-  version?: string
-  tags?: string[]
-  body: React.ComponentType
+interface PageProps {
+  searchParams: Promise<{ product?: string }>
 }
 
-interface ChangelogPage {
-  url: string
-  data: ChangelogData
-}
-
-export default function HomePage() {
-  const sortedChangelogs = useMemo(() => {
-    const allPages = source.getPages() as ChangelogPage[]
-    return allPages.sort((a, b) => {
-      const dateA = new Date(a.data.date).getTime()
-      const dateB = new Date(b.data.date).getTime()
-      return dateB - dateA
-    })
-  }, [])
+export default async function HomePage({ searchParams }: PageProps) {
+  const { product } = await searchParams
+  const products = discoverProducts()
+  const changelogs = getChangelogsByProduct(product || null)
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -45,13 +28,18 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Timeline with Tabs */}
       <div className="max-w-5xl mx-auto px-6 lg:px-10 pt-10">
+        <Suspense fallback={null}>
+          <ChangelogTabs products={products} />
+        </Suspense>
+
         <div className="relative">
-          {sortedChangelogs.map((changelog) => {
+          {changelogs.map((changelog) => {
             const MDX = changelog.data.body
             const date = new Date(changelog.data.date)
             const formattedDate = formatDate(date)
+            const productInfo = products.find((p) => p.slug === changelog.product)
 
             return (
               <div key={changelog.url} className="relative">
@@ -65,6 +53,15 @@ export default function HomePage() {
                       {changelog.data.version && (
                         <div className="inline-flex relative z-10 items-center justify-center w-10 h-10 text-foreground border border-border rounded-lg text-sm font-bold">
                           {changelog.data.version}
+                        </div>
+                      )}
+
+                      {/* Product badge when viewing "All" */}
+                      {!product && products.length > 1 && productInfo && (
+                        <div className="mt-2">
+                          <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                            {productInfo.displayName}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -85,19 +82,18 @@ export default function HomePage() {
                         </h2>
 
                         {/* Tags */}
-                        {changelog.data.tags &&
-                          changelog.data.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {changelog.data.tags.map((tag: string) => (
-                                <span
-                                  key={tag}
-                                  className="h-6 w-fit px-2 text-xs font-medium bg-muted text-muted-foreground rounded-full border flex items-center justify-center"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        {changelog.data.tags && changelog.data.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {changelog.data.tags.map((tag: string) => (
+                              <span
+                                key={tag}
+                                className="h-6 w-fit px-2 text-xs font-medium bg-muted text-muted-foreground rounded-full border flex items-center justify-center"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:font-semibold prose-a:no-underline prose-headings:tracking-tight prose-headings:text-balance prose-p:tracking-tight prose-p:text-balance">
                         <MDX />
@@ -108,6 +104,12 @@ export default function HomePage() {
               </div>
             )
           })}
+
+          {changelogs.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              No changelog entries found.
+            </div>
+          )}
         </div>
       </div>
     </div>
