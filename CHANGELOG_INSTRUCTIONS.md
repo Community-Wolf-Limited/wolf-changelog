@@ -1,27 +1,12 @@
 # Changelog Entry Creation Guide
 
-This document explains how to create a changelog entry from Git commits or PR history for this multi-product changelog system.
+This document explains how to create a changelog entry from Git commits or PR history for our multi-product changelog system. That is hosted seperaretly. 
+
+Put your change log into `/changelog`
 
 ## Overview
 
-This changelog uses MDX files organized by product. Each product has its own folder under `changelog/`, and each release gets its own MDX file.
-
-## File Location
-
-Place the MDX file in the appropriate product folder:
-
-```
-changelog/
-├── wolf/              → Wolf platform changes
-├── wa-agents/         → WhatsApp Agents changes
-├── patroller/         → Patroller changes
-├── rostering/         → Rostering changes
-├── group-feeds/       → Group Feeds changes
-├── namola/            → Namola changes
-├── access-control/    → Access Control changes
-├── api/               → API changes
-└── safety-model/      → Safety Model changes
-```
+This changelog uses MDX files organized by product. 
 
 ## File Naming Convention
 

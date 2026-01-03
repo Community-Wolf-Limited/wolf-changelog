@@ -19,6 +19,7 @@ export const { docs, meta } = defineDocs({
       date: z.string(),
       tags: z.array(z.string()).optional(),
       version: z.string().optional(),
+      images: z.array(z.string()).optional(),
     }),
   },
 })

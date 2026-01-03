@@ -13,9 +13,11 @@ import path from "path"
 
 export interface ChangelogData {
   title: string
+  description?: string
   date: string
   version?: string
   tags?: string[]
+  images?: string[]
   body: ComponentType
 }
 

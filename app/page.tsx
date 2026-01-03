@@ -94,7 +94,38 @@ export default async function HomePage({ searchParams }: PageProps) {
                             ))}
                           </div>
                         )}
+                        {/* Description */}
+                        {changelog.data.description && (
+                          <p className="text-base text-muted-foreground mt-1">{changelog.data.description}</p>
+                        )}
                       </div>
+
+                      {/* Images/videos from frontmatter */}
+                      {changelog.data.images && changelog.data.images.length > 0 && (
+                        <div className="flex flex-col gap-4">
+                          {changelog.data.images.map((fileName: string, index: number) => {
+                            const src = `/changelog/${changelog.product}/images/${fileName}`
+                            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.webm')
+
+                            return isVideo ? (
+                              <video
+                                key={index}
+                                src={src}
+                                controls
+                                className="w-full rounded-lg border border-border"
+                              />
+                            ) : (
+                              <img
+                                key={index}
+                                src={src}
+                                alt={`${changelog.data.title} - Image ${index + 1}`}
+                                className="w-full rounded-lg border border-border"
+                              />
+                            )
+                          })}
+                        </div>
+                      )}
+
                       <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:font-semibold prose-a:no-underline prose-headings:tracking-tight prose-headings:text-balance prose-p:tracking-tight prose-p:text-balance">
                         <MDX />
                       </div>

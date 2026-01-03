@@ -1,0 +1,92 @@
+---
+title: "Patrol Management System"
+description: "Complete patrol management with dynamic scheduling, checkpoint tracking, agent state management, and automated notifications"
+date: "2025-11-26"
+tags: ["Feature", "Enterprise", "Automation"]
+version: "2.2"
+images: ["Patrol Management System.png"]
+---
+
+## What's New
+
+- **Full Patrol Management**: Complete system for scheduling, tracking, and managing security patrols
+- **Dynamic Interval Tracking**: Checkpoint intervals calculated based on distance rather than fixed times
+- **Agent State Management**: Persistent state tracking with fallback to previous states
+- **Patrol Event Logging**: Detailed event logging with staff ID tracking
+- **Interactive Templates**: WhatsApp templates for patrol start, progress, and abandonment notifications
+- **Patrol Overrides**: Manager ability to override patrol schedules and settings
+
+## Improvements
+
+- **Smart Scheduling**: Patrol schedules anchored to configured start-of-day time
+- **Guard Nudging**: Automatic reminders for guards who stall mid-route
+- **Abandoned Patrol Detection**: Flags patrols that never started or were abandoned
+- **License Disc Processing**: Fixed array handling for consistent data format
+- **MongoDB Index Optimization**: Removed redundant indexes for better database performance
+
+<Accordion type="multiple" collapsible>
+  <AccordionItem value="patrol-features">
+    <AccordionTrigger>Patrol Features</AccordionTrigger>
+    <AccordionContent>
+      - Patrol loop with checkpoint verification
+      - Event generation only when due
+      - Staff ID tracking on patrol events
+      - Progress abandoned template notifications
+      - Cancel at start functionality
+      - Button payload shortcuts for patrol actions
+      - States and skills helpers for patrol management
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="scheduling">
+    <AccordionTrigger>Scheduling System</AccordionTrigger>
+    <AccordionContent>
+      - Dynamic interval calculation based on distance
+      - Start-of-day anchored scheduling
+      - Quarter-past schedule trigger support
+      - Patrol cron route for automated checks
+      - Manager help messages for patrol control
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="state-management">
+    <AccordionTrigger>Agent State Management</AccordionTrigger>
+    <AccordionContent>
+      - Fallback agent state tracking
+      - Previous agent state tracker
+      - State persistence across interactions
+      - Interactive PIN request templates
+      - Cache handling for Meta button interactions
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="templates">
+    <AccordionTrigger>Message Templates</AccordionTrigger>
+    <AccordionContent>
+      - Patrol start notification template
+      - Progress update templates
+      - Abandoned patrol alert template
+      - PIN request interactive templates
+      - vCard support for Twilio migration
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+## Bug Fixes
+
+- Fixed type errors in patrol processing
+- Resolved license plate/number spelling consistency (changed to "licence")
+- Fixed array wrapping issue in OpenRouter image processing responses
+- Corrected warning message formatting
+- Added latitude/longitude to warning events
+
+## Database Changes
+
+- Removed index creators to allow manual MongoDB index management
+- Optimized patrol event document structure
+- Added top-level staffId field to patrol events
+
+## Technical Details
+
+New and updated routes:
+- `/api/cron-patrol-events/` - Automated patrol event processing
+- Enhanced `process-patrols.ts` with dynamic interval calculations
+- `agent-state-utils.ts` for state management utilities
+

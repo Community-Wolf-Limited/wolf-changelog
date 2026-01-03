@@ -1,0 +1,87 @@
+---
+title: "Access Control, Voice Agents & AI Enhancements"
+description: "Enterprise access control flows, voice agent integration, parallel tool calling, and comprehensive health monitoring"
+date: "2025-09-15"
+tags: ["Feature", "Enterprise", "AI", "Infrastructure"]
+version: "2.1"
+images: ["Access Control, Voice Agents & AI Enhancements.png"]
+---
+
+## What's New
+
+- **Access Control Flows**: Complete access control workflow system for Enterprise tier with license disc processing and visitor management
+- **Voice Agent Integration**: VAPI-powered voice agent for hands-free incident reporting and panic alerts
+- **Parallel Tool Calling**: AI agents can now execute multiple tools simultaneously for faster response times
+- **Health Check Monitoring**: Comprehensive health check endpoints for all agent routes with dependency status
+- **Skill Router**: Intelligent routing between chat and skill-based interactions
+- **Short Links**: Shortened URLs for cleaner message formatting
+
+## Improvements
+
+- **License Disc Processing**: Improved handling of license disc scans with better data extraction
+- **Chat vs Skills Routing**: Smart routing determines whether to handle messages as conversational or skill-based
+- **Model Provider Fallback**: Automatic fallback to alternative AI providers if primary fails
+- **MongoDB Connection Caching**: Persistent database connections across function invocations
+- **Address Resolution**: HERE Maps API integration for consistent address formatting
+
+<Accordion type="multiple" collapsible>
+  <AccordionItem value="access-control">
+    <AccordionTrigger>Access Control System</AccordionTrigger>
+    <AccordionContent>
+      - Two-stage access control flows (flow-1 and flow-2)
+      - Person and vehicle verification checks
+      - Access event logging and tracking
+      - Driving details processing
+      - Skill router for chat vs tool interactions
+      - Button payload shortcuts for quick actions
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="voice-agent">
+    <AccordionTrigger>Voice Agent</AccordionTrigger>
+    <AccordionContent>
+      - VAPI integration for voice interactions
+      - Panic utilities for emergency situations
+      - Voice-specific system prompts
+      - Voice tools for incident reporting
+      - ASCII art response formatting
+      - Health endpoint for voice agent status
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="ai-improvements">
+    <AccordionTrigger>AI Improvements</AccordionTrigger>
+    <AccordionContent>
+      - Parallel tool calling for Community and Enterprise agents
+      - Updated system prompts for better context handling
+      - First turn priorities for improved conversation flow
+      - Transcription model updates
+      - Tool calling definition improvements
+      - Admin-only beta tool access
+    </AccordionContent>
+  </AccordionItem>
+  <AccordionItem value="health-monitoring">
+    <AccordionTrigger>Health Monitoring</AccordionTrigger>
+    <AccordionContent>
+      - Health routes for all agent endpoints
+      - Dependency health checking (MongoDB, external APIs)
+      - OnlineOrNot integration setup
+      - Status heartbeat system
+      - Comprehensive health check documentation
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+
+## Bug Fixes
+
+- Fixed chat history duplication ("double Accept" issue)
+- Fixed sticker and reaction message handling
+- Resolved video message case handling
+- Fixed chat history storage location
+- Corrected conditional logic for Meta vs Twilio platforms
+
+## Technical Details
+
+New API routes:
+- `/api/agents/voice-agent/` - Voice agent endpoints
+- `/api/agents/*/health/` - Health checks for all agents
+- `/api/health/` - Global health status
+- `/api/internal/health/deps/` - Dependency health checks
