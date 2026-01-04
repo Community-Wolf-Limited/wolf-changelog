@@ -1,4 +1,5 @@
 {
-  "displayName": "Safety API",
-  "order": 60
+  "displayName": "Intelligent Safety API",
+  "order": 80,
+  "description": "AI-powered safety prediction and risk assessment APIs for location-based threat analysis."
 }

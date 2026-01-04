@@ -1,66 +1,26 @@
 ---
-title: "Meta WhatsApp Migration & Alert System"
-description: "Migration to Meta WhatsApp Business API with new two-stage alert verification flow and automated reporting"
+title: "WhatsApp Business Platform Migration & Alerts"
+description: "Upgraded to WhatsApp Business Platform with new two-stage alert verification and automated reporting"
 date: "2025-07-25"
-tags: ["Feature", "Infrastructure", "Breaking Change"]
+tags: ["Feature", "Breaking Change"]
 version: "2.0"
 images: ["Meta WhatsApp Migration & Alert System.png"]
 ---
 
 ## What's New
 
-- **Meta WhatsApp Business API**: Full support for Meta's WhatsApp Business Platform with webhook verification and signature validation
-- **Two-Stage Alert Verification**: New alert flow with verification steps before broadcasting to ensure accuracy
-- **Report Alert Logging**: Dedicated collection for alert tracking with migration from nested arrays for better scalability
-- **Webhook Dispatcher**: Centralized webhook routing for multi-agent message handling
-- **Automated Reporting**: Daily and weekly cron jobs for statistics and user engagement updates
-- **Enterprise Templates**: Platform-specific message templates for Meta and Twilio
+- **WhatsApp Business Platform**: Upgraded to the official WhatsApp Business Platform for improved reliability and features
+- **Two-Stage Alert Verification**: New verification flow before broadcasting alerts to ensure accuracy
+- **Automated Reporting**: Daily and weekly automated reports for statistics and engagement updates
+- **Interactive Alerts**: Respond to alerts with interactive buttons directly in WhatsApp
 
 ## Improvements
 
-- **Alert Flow Architecture**: Complete redesign of alert flows with button payloads and variable support
+- **Redesigned Alert Flow**: Cleaner, more intuitive alert experience with button-based interactions
 - **Trip Acknowledgement**: Users can now acknowledge trip alerts with interactive buttons
-- **License Disc Scanning**: Enhanced manager alerts with actionable buttons
-- **Address Resolution**: Improved location-to-address conversion using HERE Maps API
-- **Report Caching**: MongoDB-based report cache for faster access and reduced API calls
+- **Better Location Resolution**: Improved location-to-address conversion for more accurate addresses
+- **Faster Reports**: Report data now loads faster with improved caching
 
-<Accordion type="multiple" collapsible>
-  <AccordionItem value="meta-integration">
-    <AccordionTrigger>Meta Integration Details</AccordionTrigger>
-    <AccordionContent>
-      - Webhook signature verification for security
-      - Message format conversion (Meta to Twilio format)
-      - Platform-specific template identifiers
-      - Support for interactive message components
-      - Bearer token authentication for API calls
-    </AccordionContent>
-  </AccordionItem>
-  <AccordionItem value="alert-system">
-    <AccordionTrigger>Alert System</AccordionTrigger>
-    <AccordionContent>
-      - Individual alert documents in report-alerts collection
-      - Migration scripts for existing alert data
-      - Index creation for optimized queries
-      - Alert flow endpoints for external integrations
-      - Emergency contact variable support for trips
-    </AccordionContent>
-  </AccordionItem>
-  <AccordionItem value="automation">
-    <AccordionTrigger>Automation & Scheduling</AccordionTrigger>
-    <AccordionContent>
-      - Daily trigger cron route for statistics
-      - Weekly trigger cron route for summaries
-      - Internal webhook documentation
-      - Slack webhook integration templates
-      - Email notification templates
-    </AccordionContent>
-  </AccordionItem>
-</Accordion>
+## Breaking Changes
 
-## Technical Changes
-
-- New API routes for alert flows at `/api/alert-flows/`
-- Webhook dispatcher at `/api/webhooks/agents/`
-- CORS support for cross-origin webhook calls
-- setTimeout handling improvements for serverless environments
-- Date/time function improvements for local timezone support
+> **Note**: This release upgrades the underlying WhatsApp platform. Existing integrations may require reconfiguration.

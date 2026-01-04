@@ -1,0 +1,35 @@
+---
+title: "Multi-City Support: London Added"
+description: "Crime predictions now available for London, UK alongside Chicago with unified auto-routing API"
+date: "2025-12-02"
+tags: ["Feature", "Enterprise"]
+version: "0.5"
+---
+
+## What's New
+
+- **London Coverage**: Full crime prediction support for Greater London using Metropolitan Police data
+
+- **Unified API with Auto-Routing**: Send coordinates from any supported city - the API automatically detects location and routes to the correct model
+
+- **International Expansion**: First cross-Atlantic deployment, proving the system works with different police data formats and crime categorizations
+
+## Coverage Details
+
+| City | Grid Cells | Prediction Accuracy |
+|------|------------|---------------------|
+| Chicago | 278 | 4.32% error |
+| London | 590 | 4.02% error |
+
+## How It Works
+
+No changes needed to your integration. Simply send coordinates:
+- Chicago coordinates receive Chicago predictions
+- London coordinates receive London predictions
+- Unsupported locations return a clear "not covered" response
+
+## London-Specific Features
+
+- Adapted to UK crime categorization from Met Police data
+- 590 prediction cells covering Greater London
+- Full probability distributions matching Chicago format

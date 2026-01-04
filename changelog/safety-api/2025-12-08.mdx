@@ -1,0 +1,49 @@
+---
+title: "Crime Volume Forecasting"
+description: "Predictions now include expected crime counts alongside probability distributions"
+date: "2025-12-08"
+tags: ["Feature", "Enhancement"]
+version: "0.9"
+---
+
+## What's New
+
+- **Expected Crime Counts**: The model now predicts not just "what type of crime" but also "how many crimes" to expect in each area
+
+- **Per-Type Volume Breakdown**: Get expected counts broken down by crime category (e.g., "expect 3 thefts, 2 assaults this week")
+
+## Before vs After
+
+**Before**: "This area has 35% theft probability, 25% assault"
+**After**: "This area has 35% theft (expect ~3 incidents), 25% assault (expect ~2 incidents), 8.5 total crimes expected"
+
+## All Cities Updated
+
+Every city model has been retrained with dual prediction capabilities:
+
+| City | Distribution Error | Count Correlation |
+|------|-------------------|-------------------|
+| London | 3.54% | 0.62 |
+| Chicago | 3.99% | 0.88 |
+| NYC | 4.33% | 0.77 |
+| LA | 4.44% | 0.80 |
+| Philadelphia | 4.69% | 0.87 |
+| SF | 4.79% | 0.79 |
+| Denver | 4.82% | 0.62 |
+| Toronto | 4.82% | 0.79 |
+| Boston | 5.82% | 0.85 |
+| Seattle | 6.19% | 0.86 |
+
+## Improvements
+
+- **8 cities now under 5% error** (up from 5)
+- Boston improved from 7.85% to 5.82% error
+- SF improved from 6.26% to 4.79% error
+- Average error across all cities: 4.74%
+
+## API Response Updates
+
+All prediction endpoints now include:
+- `expected_total`: Total crimes expected in the time period
+- `expected_counts`: Breakdown by crime type
+- `count_mae`: Model accuracy for volume predictions

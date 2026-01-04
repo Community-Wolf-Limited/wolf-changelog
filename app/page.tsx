@@ -34,6 +34,13 @@ export default async function HomePage({ searchParams }: PageProps) {
           <ChangelogTabs products={products} />
         </Suspense>
 
+        {/* Product description */}
+        {product && products.find((p) => p.slug === product)?.description && (
+          <p className="text-muted-foreground text-sm mb-8 max-w-2xl">
+            {products.find((p) => p.slug === product)?.description}
+          </p>
+        )}
+
         <div className="relative">
           {changelogs.map((changelog) => {
             const MDX = changelog.data.body
@@ -126,7 +133,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                         </div>
                       )}
 
-                      <div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:font-semibold prose-a:no-underline prose-headings:tracking-tight prose-headings:text-balance prose-p:tracking-tight prose-p:text-balance">
+                      <div className="prose prose-sm dark:prose-invert max-w-none prose-h2:text-base prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-headings:scroll-mt-8 prose-headings:font-semibold prose-a:no-underline prose-headings:tracking-tight prose-headings:text-balance prose-p:tracking-tight prose-p:text-balance">
                         <MDX />
                       </div>
                     </div>

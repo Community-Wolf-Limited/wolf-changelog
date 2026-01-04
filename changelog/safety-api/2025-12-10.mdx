@@ -1,0 +1,46 @@
+---
+title: "Daily and Hourly Predictions with Baseline Model"
+description: "Added statistical baseline model providing daily/hourly granularity and detailed crime type breakdowns"
+date: "2025-12-10"
+tags: ["Feature", "Enhancement"]
+version: "1.0"
+---
+
+## What's New
+
+- **Daily Predictions**: Get expected crime counts for any specific day, not just weekly aggregates
+
+- **Hourly Breakdowns**: Understand when crime is most likely throughout the day with peak hour analysis
+
+- **Detailed Crime Types**: See breakdown within categories (e.g., within "Theft", what percentage is vehicle break-ins vs shoplifting)
+
+- **Confidence Intervals**: Statistical bounds on predictions (e.g., "expect 12 crimes, 95% confidence between 8-17")
+
+## Two Complementary Models
+
+The API now provides insights from two models in a single response:
+
+| Model | Strengths |
+|-------|-----------|
+| **Primary (Deep Learning)** | Weekly patterns, spatial relationships, probability distributions |
+| **Baseline (Statistical)** | Daily/hourly precision, specific crime types, confidence intervals |
+
+## New Response Fields
+
+Predictions now include:
+- **Expected daily counts** by crime bucket
+- **Peak hours** for each crime type with risk multipliers
+- **Top 15 specific crime types** within each category
+- **Time factors** (day-of-week effect, seasonal patterns, recent trends)
+- **Historical comparisons** (vs day-of-week average, monthly average, recent 4-week average)
+
+## Use Cases
+
+- "What's the worst hour for theft in this area?" - Peak hour analysis
+- "Is today above or below normal?" - Historical comparison
+- "What specific crimes should I worry about?" - Detailed type breakdown
+- "How confident are you in this prediction?" - 95% confidence intervals
+
+## Performance
+
+All 10 cities now have baseline models that train in under 60 seconds, enabling rapid updates as new data becomes available.

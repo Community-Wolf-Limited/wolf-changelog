@@ -1,0 +1,45 @@
+---
+title: "Crime Prediction API Launched"
+description: "First public release of the crime prediction API with single location, batch, and route risk endpoints"
+date: "2025-11-28"
+tags: ["Feature", "Enterprise"]
+version: "0.3"
+---
+
+## What's New
+
+- **Single Location Predictions**: Send any latitude/longitude in Chicago and receive a complete crime probability distribution with risk level assessment
+
+- **Batch Predictions**: Query up to 100 locations in a single request with summary statistics across all locations
+
+- **Route Risk Assessment**: Calculate cumulative crime risk along a travel route with segment-by-segment breakdown and customizable risk weighting
+
+## New Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| Single Prediction | Get crime probabilities for any location |
+| Batch Prediction | Compare multiple locations at once |
+| Route Risk | Assess safety along a planned route |
+| Coverage Info | Check available geographic bounds |
+
+## What You Get Back
+
+For each prediction request, you receive:
+- Probability breakdown across 6 crime categories
+- Dominant crime type and confidence level
+- Overall risk classification (Low, Moderate, High, Very High)
+- Grid cell information for the queried location
+
+## Use Cases
+
+- **Delivery routing**: Identify safer routes for drivers
+- **Real estate**: Compare neighborhood safety profiles
+- **Urban planning**: Understand crime distribution patterns
+- **Personal safety**: Plan safer travel routes
+
+## Model Performance
+
+- 4.50% mean absolute error (new best!)
+- All crime categories balanced below 6% individual error
+- Strong correlation between predicted and actual patterns

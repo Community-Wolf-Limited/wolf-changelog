@@ -1,4 +1,5 @@
 {
   "displayName": "WhatsApp Agents",
-  "order": 1
+  "order": 1,
+  "description": "Available for free globally on WhatsApp, our agents collect information about public safety matters in your first language to help predict, model, and understand crime."
 }
