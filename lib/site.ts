@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "Changelog",
-  url: "https://changelog-magicui.vercel.app",
+  url: "https://changelog.communitywolf.com/",
   description: "A changelog for Community Wolf.",
   links: {
 
