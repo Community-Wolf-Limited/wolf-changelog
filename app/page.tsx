@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { WolfIcon } from "@/components/wolf-icon"
 import { ChangelogTabs } from "@/components/changelog-tabs"
 import {
   discoverProducts,
@@ -22,7 +23,10 @@ export default async function HomePage({ searchParams }: PageProps) {
       <div className="border-b border-border/50">
         <div className="max-w-5xl mx-auto relative">
           <div className="p-3 flex items-center justify-between">
-            <h1 className="text-3xl font-semibold tracking-tight">Changelog</h1>
+            <div className="flex items-center gap-2">
+              <WolfIcon size={28} className="text-primary" />
+              <h1 className="text-xl font-semibold tracking-tight">Changelog</h1>
+            </div>
             <ThemeToggle />
           </div>
         </div>
