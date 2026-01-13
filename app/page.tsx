@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { WolfIcon } from "@/components/wolf-icon"
 import { ChangelogTabs } from "@/components/changelog-tabs"
+import { ChangelogMediaGallery } from "@/components/changelog-media-gallery"
 import {
   discoverProducts,
   getChangelogsByProduct,
@@ -111,30 +112,13 @@ export default async function HomePage({ searchParams }: PageProps) {
                         )}
                       </div>
 
-                      {/* Images/videos from frontmatter */}
+                      {/* Images/videos from frontmatter (rendered as a slideshow + lightbox when multiple exist) */}
                       {changelog.data.images && changelog.data.images.length > 0 && (
-                        <div className="flex flex-col gap-4">
-                          {changelog.data.images.map((fileName: string, index: number) => {
-                            const src = `/changelog/${changelog.product}/images/${fileName}`
-                            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.webm')
-
-                            return isVideo ? (
-                              <video
-                                key={index}
-                                src={src}
-                                controls
-                                className="w-full rounded-lg border border-border"
-                              />
-                            ) : (
-                              <img
-                                key={index}
-                                src={src}
-                                alt={`${changelog.data.title} - Image ${index + 1}`}
-                                className="w-full rounded-lg border border-border"
-                              />
-                            )
-                          })}
-                        </div>
+                        <ChangelogMediaGallery
+                          title={changelog.data.title}
+                          productSlug={changelog.product}
+                          fileNames={changelog.data.images}
+                        />
                       )}
 
                       <div className="prose prose-sm dark:prose-invert max-w-none prose-h2:text-base prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-headings:scroll-mt-8 prose-headings:font-semibold prose-a:no-underline prose-headings:tracking-tight prose-headings:text-balance prose-p:tracking-tight prose-p:text-balance">
