@@ -1,0 +1,17 @@
+---
+title: "Improved Shared Link Reliability"
+description: "Shared links now open reliably even when the original link is malformed"
+date: "2026-01-15"
+tags: ["Bug Fix", "Enhancement", "Free"]
+# images: ["shared-link-reliability.png"] # TODO: Add screenshot/video when available
+---
+
+## Bug Fixes
+
+- **Fixed broken shared links**: Resolved an issue where some shared links could incorrectly land on a 404 page instead of the intended starting page
+- **Preserved link parameters**: When a redirect is needed, any parameters included in the link are kept so users still land in the right context
+
+## Improvements
+
+- **More resilient link handling**: The app now better tolerates unusual or malformed link formats from external sources
+
