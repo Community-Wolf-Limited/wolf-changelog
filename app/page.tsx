@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import Link from "next/link"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { WolfIcon } from "@/components/wolf-icon"
 import { ChangelogTabs } from "@/components/changelog-tabs"
@@ -25,7 +26,13 @@ export default async function HomePage({ searchParams }: PageProps) {
         <div className="max-w-5xl mx-auto relative">
           <div className="p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <WolfIcon size={28} className="text-primary" />
+              <Link
+                href="https://www.communitywolf.com"
+                aria-label="Community Wolf home"
+                className="hover:opacity-80 transition-opacity"
+              >
+                <WolfIcon size={28} className="text-primary" />
+              </Link>
               <h1 className="text-xl font-semibold tracking-tight">Changelog</h1>
             </div>
             <ThemeToggle />
@@ -71,7 +78,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                       {/* Product badge when viewing "All" */}
                       {!product && products.length > 1 && productInfo && (
                         <div className="mt-2">
-                          <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-full">
+                          <span className="text-xs px-2 py-1 bg-muted text-muted-foreground rounded-lg">
                             {productInfo.displayName}
                           </span>
                         </div>
@@ -99,7 +106,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                             {changelog.data.tags.map((tag: string) => (
                               <span
                                 key={tag}
-                                className="h-6 w-fit px-2 text-xs font-medium bg-muted text-muted-foreground rounded-full border flex items-center justify-center"
+                                className="h-6 w-fit px-2 text-xs font-medium bg-muted text-muted-foreground rounded-lg border flex items-center justify-center"
                               >
                                 {tag}
                               </span>

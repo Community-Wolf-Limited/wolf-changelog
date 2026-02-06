@@ -24,7 +24,7 @@ export function ChangelogTabs({ products }: ChangelogTabsProps) {
         role="tab"
         aria-selected={currentProduct === null}
         className={cn(
-          "px-3 py-1.5 text-sm font-medium rounded-full transition-all border",
+          "px-3 py-1.5 text-sm font-medium rounded-lg transition-all border",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           currentProduct === null
             ? "bg-foreground text-background border-foreground"
@@ -41,7 +41,7 @@ export function ChangelogTabs({ products }: ChangelogTabsProps) {
           role="tab"
           aria-selected={currentProduct === product.slug}
           className={cn(
-            "px-3 py-1.5 text-sm font-medium rounded-full transition-all border",
+            "px-3 py-1.5 text-sm font-medium rounded-lg transition-all border",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             currentProduct === product.slug
               ? "bg-foreground text-background border-foreground"

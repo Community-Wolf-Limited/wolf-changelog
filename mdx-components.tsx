@@ -12,11 +12,11 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
     ...defaultMdxComponents,
     img: ({ className, ...props }: React.ComponentProps<"img">) => (
-      <img className={cn("rounded-md border", className)} {...props} />
+      <img className={cn("rounded-lg border", className)} {...props} />
     ),
     Video: ({ className, ...props }: React.ComponentProps<"video">) => (
       <video
-        className={cn("rounded-md border", className)}
+        className={cn("rounded-lg border", className)}
         controls
         loop
         {...props}

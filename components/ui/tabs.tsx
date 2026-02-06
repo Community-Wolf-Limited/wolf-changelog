@@ -21,7 +21,7 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
         aria-selected={value === null}
         onClick={() => onChange(null)}
         className={cn(
-          "px-3 py-1.5 text-sm font-medium rounded-full transition-all border",
+          "px-3 py-1.5 text-sm font-medium rounded-lg transition-all border",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           value === null
             ? "bg-foreground text-background border-foreground"
@@ -38,7 +38,7 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
           aria-selected={value === tab.value}
           onClick={() => onChange(tab.value)}
           className={cn(
-            "px-3 py-1.5 text-sm font-medium rounded-full transition-all border",
+            "px-3 py-1.5 text-sm font-medium rounded-lg transition-all border",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             value === tab.value
               ? "bg-foreground text-background border-foreground"

@@ -15,8 +15,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: siteConfig.name,
-    template: `%s - ${siteConfig.name}`,
+    default: "Changelog - Community Wolf",
+    template: "%s - Community Wolf Changelog",
   },
   description: siteConfig.description,
 }
