@@ -1,22 +1,22 @@
 ---
-title: "Platform — 2026-03-03"
-description: "Updates merged to main on 2026-03-03."
+title: "Precincts and safety paths, report editing, and access-control scale"
+description: "A precinct and safety-path experience for planning routes, richer report editing with history, and faster access-control analytics with clearer exports."
 date: "2026-03-03"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.30"
 ---
 
 ## What's New
 
-- Add Police Precincts & Safety Path Finder module
-- Add analytics cache store and progressive loading UX
-- Improve vehicle radar bucketing, metric cards, and flag tracking
-- Add report editing, incident date, and edit history
+- **Precincts and safety paths**: Teams can work with police precinct context and safety-path planning in a dedicated module aligned with your site and map setup.
+- **Report editing**: Reports support incident dates and a visible edit trail so changes are auditable without digging through raw logs.
+- **Vehicle monitoring**: Radar-style views use clearer bucketing and metric cards, with more reliable flag tracking during investigations.
 
 ## Improvements
 
-- Release integration: `feature/performance-optimizations`.
+- **Access control loading**: Analytics and heavy tables load in stages with caching so returning to a tab or re-running a view feels faster under load.
+- **Export dialogs**: Export limits are tighter where large extracts could strain operations, with clearer descriptions so users know what to expect.
 
 ## Bug Fixes
 
-- Tighten export modal limit and add dialog descriptions
+- **Export limits**: Large export requests are constrained more predictably, with messaging that matches the limit behaviour.

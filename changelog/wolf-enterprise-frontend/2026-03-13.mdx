@@ -1,16 +1,17 @@
 ---
-title: "Platform — 2026-03-13"
-description: "Updates merged to main on 2026-03-13."
+title: "Licence plate search and resilient safety routing"
+description: "Faster, clearer vehicle search in access control, with more resilient safety-routing baselines when services are slow—and smarter recovery when health checks fail."
 date: "2026-03-13"
 tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+version: "2.35"
 ---
 
 ## What's New
 
-- Improve licence plate search UX
-- Resilient baseline eval, Go health fallback, IndexedDB cache
+- **Licence plate search**: The access-control search experience for vehicles is redesigned for speed and clarity—fewer dead ends, clearer results, and behaviour tuned for high-volume monitoring shifts when plates stream in continuously.
+- **Resilient routing baselines**: Safety routing evaluates baselines more safely when inputs are partial or timing is tight, with fallbacks when upstream health is degraded so the UI does not hard-fail mid-session.
+- **Session-friendly caching**: Recently used routing and hex context is retained locally so returning to a tab or resuming after a short interruption feels like continuing—not starting over.
 
 ## Improvements
 
-- Release integration: `feat/access-control-licence-search`.
+- **Staging integration**: Multiple merges land the licence-search and routing-hardening work together so production picks up both behaviours in one upgrade path.

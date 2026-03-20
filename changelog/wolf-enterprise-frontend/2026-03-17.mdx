@@ -1,23 +1,23 @@
 ---
-title: "Platform — 2026-03-17"
-description: "Updates merged to main on 2026-03-17."
+title: "Billing refinements, site validation, hex streaming, and routing UI"
+description: "Refined enterprise billing copy, stricter site editing validation, faster and safer streaming for large hex payloads, a simpler safety-routing layout, and hardening around map layer readiness—including a brief revert cycle on one streaming fix before the final behaviour landed."
 date: "2026-03-17"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.38"
 ---
 
 ## What's New
 
-- Refine enterprise billing workspace
-- Replace char-by-char hex parser with indexOf-based streaming
+- **Billing workspace polish**: Morning follow-up copy and layout refinements make subscription, paid features, and special-access messaging easier to scan for admins who live in this screen during renewals and audits.
 
 ## Improvements
 
-- Release integration: `fix/hex-download-and-map-guard`, `fix/site-validation-and-hex-streaming`.
-- Revert "fix: stream /hexes/all response and guard map.getLayer crashes"
-- Simplify routing UI and improve EditSite validation
+- **Site editing validation**: Site create/edit flows treat optional fields as optional in the schema, with clearer validation when required data is missing—reducing saves that silently drop data or fail late in the flow.
+- **Hex payload streaming**: Large hex responses stream with a faster parser (less per-character overhead) and a JSON parser tuned for chunked payloads so the UI stays responsive while data arrives.
+- **Safety routing layout**: Routing and site editing share a simplified routing chrome and tighter **Edit site** validation so common tasks stay on one screen without nested confusion.
+- **Staging and fix trains**: Multiple staging merges land site-validation and hex-streaming fixes in coordinated batches so related behaviour ships together.
 
 ## Bug Fixes
 
-- Stream /hexes/all response and guard map.getLayer crashes
-- Nullish site schema fields and streaming hex JSON parser
+- **Hex streaming and map readiness**: Streaming fixes ensure large hex datasets can load incrementally; guards prevent calls into the map before layers exist, avoiding crashes when toggling views quickly. One change was briefly reverted and then re-applied so the final behaviour matches what QA signed off.
+- **Map layers**: Edge cases where code touched map layers before initialisation completed are handled safely across safety and live-map flows.

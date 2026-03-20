@@ -1,19 +1,22 @@
 ---
-title: "Platform — 2026-03-06"
-description: "Updates merged to main on 2026-03-06."
+title: "Safety routing, richer reports, and live map alignment"
+description: "A dedicated safety-routing workspace with route insight and simulation-style feedback, deeper community report filtering and detail, live-map and sidebar alignment with reports, and shared navigation and time controls—plus analytics sync and theme fixes."
 date: "2026-03-06"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.33"
 ---
 
 ## What's New
 
-- Add safety routing, enhance reports, and improve live map
+- **Safety routing workspace**: Plan and review routes in a focused area with scoring context and simulation-style movement feedback where your organisation enables it, backed by a dedicated client for route and corridor insight.
+- **Report discovery and detail**: Report lists, filter menus, and detail views are rebuilt so moving between analytics summaries and individual incidents feels like one flow—with saved filter utilities and tests to keep behaviour stable as data grows.
+- **Live map and reports sidebar**: The live map and reports sidebar stay aligned with what you have selected in time and scope, including crime-hex context where configured.
+- **Shared navigation and chrome**: Sidebar routes, time sliders, loading screens, and multi-select controls are brought in line so routing, reports, and map sessions share the same interaction patterns.
 
 ## Improvements
 
-- Release integration: `feature/performance-optimizations`.
+- **Map and time controls**: Map pages respect report selection and time sliders more consistently during long monitoring sessions, with fewer mismatches between the map and the report list.
 
 ## Bug Fixes
 
-- Reports analytics sync, loading theme, and filter robustness
+- **Reports analytics**: Analytics panels stay in sync with the rest of reporting; loading states follow the active theme; filters remain robust when underlying data refreshes or when you switch tabs quickly.

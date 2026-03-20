@@ -1,31 +1,30 @@
 ---
-title: "Platform — 2026-03-19"
-description: "Updates merged to main on 2026-03-19."
+title: "Live map layers, zoom, crime context, access control exports, and billing"
+description: "Human-readable map layers and deeper zoom, national crime context with privacy-aware reporting, access-control export expansion, survey programme attribution, billing clarity, and removal of an experimental payment integration—plus tighter precinct behaviour and loading order."
 date: "2026-03-19"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.40"
 ---
 
 ## What's New
 
-- Add additional info columns to PDF export
-- Clarify billing and special-access gating UX
-- Add person info columns to table and PDF export
-- Crime hex national layer, report orbit (POPIA), billing removal, precincts
-- Human-friendly layer names, tooltips, and precincts refactor
-- Increase live map max zoom from 14 to 15
-- Increase live map max zoom to 16
-- Align map with safety-routing, shared IndexedDB, precinct choropleth
-- Crime hex viewport parity and session layer defaults
+- **Layer names and precincts**: Map layers use plain-language names and short tooltips; precinct-related presentation is refactored so boundaries and labels stay understandable at a glance.
+- **Deeper zoom**: Maximum zoom on the live map increases in two steps so teams can move from neighbourhood context down to street-level detail when reviewing incidents and places.
+- **Crime hex and viewport**: Crime density respects the visible map area more consistently, and your last-used layer choices carry sensibly between sessions so you are not resetting filters every visit.
+- **Map and safety alignment**: The live map shares behaviour and client-side caching with safety routing, including precinct shading where enabled, so the two experiences feel like one product rather than two maps.
+- **National crime layer**: A national crime view helps compare local activity to wider patterns where your organisation turns it on; related reporting flows are shaped with privacy expectations in mind (including how report detail is surfaced).
+- **Live map and billing UI**: In-product billing prompts on the live map are removed so the map stays focused on operations; subscription context instead lives with your billing and access tools.
+- **Access control — person-related fields**: Optional person-related columns can appear in the investigation table and in PDF exports when your policy allows; additional structured fields can be included on PDF exports where configured.
+- **Billing and special access**: Copy and gating around subscriptions, paid capabilities, and special access is clearer for admins and finance.
+- **Survey programme attribution**: Surveys can show attribution where the GIG Quest programme applies.
+- **Payment integration**: A third-party subscription checkout integration was merged, then **reverted** the same day so production returns to the previous, simpler billing story—avoiding a half-enabled payment path in the app.
 
 ## Improvements
 
-- Release integration: `stripe-integration`, `feat/gig-quest-integration`, `feature/access-control-export-additional-fields`, `feature/access-control-person-info`, `feature/live-map-enhancements`, `feature/layer-names-and-precincts-refactor`.
-- Revert "Merge pull request #28 from Community-Wolf-Limited/stripe-integration"
-- Revert "Merge pull request #47 from Community-Wolf-Limited/stripe-integration"
-- Merge origin/main into feature/live-map-enhancements
-- Merge origin/staging
+- **Merge train**: Multiple feature and staging merges land the live-map enhancement branch together with access-control export work, billing UX, and programme integrations so environments do not sit half-upgraded.
+- **Loading order**: Background work is sequenced so the most important map layers become usable sooner during busy sessions.
+- **Precinct boundaries**: Boundary visibility and reuse of cached boundary data are faster and more predictable when zooming or returning to an area.
 
 ## Bug Fixes
 
-- Precinct visibility + instant boundary cache
+- **Precinct display**: Fixed cases where precinct boundaries did not appear as expected until the map finished loading or until you changed zoom.

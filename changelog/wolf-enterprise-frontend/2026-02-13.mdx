@@ -1,23 +1,18 @@
 ---
-title: "Platform — 2026-02-13"
-description: "Updates merged to main on 2026-02-13."
+title: "Device locations, alerts, and access control table controls"
+description: "Alarm and device management gains locations, alerts, and people-on-device views with a phone-first installer link flow; access control adds column controls and faster filtering at scale."
 date: "2026-02-13"
 tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+version: "2.21"
 ---
 
 ## What's New
 
-- Parallel filter fetch, API timeout, and licence-disc socket/cache fixes
-- Column visibility toggle and intelligence hydration for socket rows
-- Move installer linking to phone-first flow
+- **Device locations and alerts**: See where hardware sits on a map, track alert activity in one place, and manage who is associated with each device when your organisation uses the device workspace.
+- **Installer linking**: Pairing or linking installers favours a phone-first flow so field staff can complete steps on mobile without fighting desktop-only paths.
+- **Access control columns**: Choose which columns appear in licence-plate investigations and keep labels consistent so teams share the same view during live monitoring.
 
 ## Improvements
 
-- **3** merges to main.
-- Merge remote-tracking branch 'origin/main' into feature/alarm-devices-ui
-- Merge remote-tracking branch 'origin/staging' into feat/gig-quest-integration
-
-## Bug Fixes
-
-- Column visibility labels and personName column id
+- **Filters and plate views**: Filter work runs in parallel where it helps, slow calls time out more gracefully, and plate rows stay in sync when data streams in during busy shifts.
+- **Device workspace**: Live updates keep device, location, and alert views current while you work across tabs.

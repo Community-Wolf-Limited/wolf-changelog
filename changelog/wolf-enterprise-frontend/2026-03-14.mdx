@@ -1,28 +1,29 @@
 ---
-title: "Platform — 2026-03-14"
-description: "Updates merged to main on 2026-03-14."
+title: "Scoring v2, hex alignment, radar, reports, and precinct overlays"
+description: "End-to-end crime hex resolution and scoring alignment, group radar structure, report detail hooks, precinct overlay controls and cache hygiene, routing-side precinct loading, and fixes across widgets and exports."
 date: "2026-03-14"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.36"
 ---
 
 ## What's New
 
-- Add 'None' overlay option for precinct choropleth
-- Use Go router for precinct loading
-- Hex-resolution, hex-scoring alignment, cw-unified-crime-hex-api
+- **Hex resolution and scoring**: Crime hex cells use consistent resolution rules and scoring alignment end-to-end so colours, modifiers, and labels match when you compare cells or switch between map and analysis views.
+- **Unified crime hex integration**: The shared crime-hex pipeline is wired through resolution, scoring, and display so analysts are not fighting two different interpretations of the same cell.
+- **Neutral precinct overlay**: You can choose a **None** overlay mode for precinct choropleth shading—boundaries remain visible without a risk tint when you need a clean basemap for screenshots or briefings.
+- **Radar structure**: Group radar extracts a dedicated main content surface and data hook so feeds and metrics stay readable during live review and future iterations are safer.
 
 ## Improvements
 
-- Release integration: `fix/scoring-v2`.
-- Options object, baseUrlOverride for Go router
-- Extract useReportDetail, useReportDetailData, useReportComment hooks
-- Extract RadarMainContent and useRadarData hook
-- DataVisualisation, skillReport, skillType; refactor dataProcessor, exportGroupAgentCsv
+- **Report detail architecture**: Report detail, underlying data fetch, and comments move behind focused hooks so the page scales as fields and commentary grow without fragile prop drilling.
+- **Precinct loading and readiness**: Precinct choropleth waits for the map to be ready before painting, with automatic boundary enablement when the view is stable—fewer races where shading appears on a half-initialised map.
+- **Precinct client configuration**: Precinct-related clients accept clearer options and overrides for routing-side loading so environments can point at the right services without one-off forks.
+- **Routing-side precinct fetch**: Precinct boundaries for safety routing can be loaded through the same routing-oriented path as the rest of the safety map, reducing duplicate fetches and mismatched timing.
+- **Data and export types**: Supporting types for analytics visualisation, skill reports, and CSV export paths are normalised so downstream exports stay consistent when schemas evolve.
+- **Onboarding and shell styling**: First-step organisation basics and shared styling tokens are updated so early setup flows stay visually aligned with the rest of the enterprise shell.
 
 ## Bug Fixes
 
-- Scoring v2 — consume Go ss, proportional POI, display labels
-- Bump DB version, clear stale Go cache on upgrade
-- Choropleth mapReady race, auto-enable boundaries
-- MiniMap, WidgetBarChart, WidgetTemplateDialog, ReportIntelligenceGraph, use-component-search
+- **Scoring v2 display**: Scoring consumes the latest server-side scoring payload, applies proportional weighting for place-related overlays, and fixes labels so patrol and analysis teams see what they expect.
+- **Widgets and embedded maps**: Mini maps, bar-chart widgets, template dialogs, intelligence graphs, and global component search behave more reliably when data is sparse or when layouts reflow on smaller screens.
+- **Precinct local cache**: The on-device precinct cache bumps its schema version and clears stale routing-side cache entries on upgrade so you are not stuck with outdated boundaries after a release.

@@ -1,23 +1,25 @@
 ---
-title: "Platform — 2026-02-03"
-description: "Updates merged to main on 2026-02-03."
+title: "Public reports follow-up, map pins, and access safeguards"
+description: "Sharper public incident flows with map pins and steadier submissions, quicker paths for admins, and tighter controls on who can assign site skills."
 date: "2026-02-03"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.14"
 ---
 
 ## What's New
 
-- Add log_person_info skill to enterprise frontend
-- Restrict site-level skill assignment to GLOBAL admins
-- Add public incident report links
-- Add map pin workflow
+- **Map pin workflow**: Community members using a public incident link can place and adjust a location pin as part of the flow so reports line up with the right place on the map.
+- **Emergency staff messaging**: The emergency requests experience supports richer templates and clearer handling when messages need to go to your team in urgent situations.
+- **Access control skills**: New options in staff setup support access-control workflows that need person-related logging where your organisation enables them.
+- **Site skill assignment**: Only organisation-wide administrators can assign certain skills at the site level, reducing the risk of misconfiguration for large deployments.
 
 ## Improvements
 
-- Release integration: `feat/emergency-send-to-staff-template`, `feat/person-only-access-control-flow-skill`, `feature/public-incident-report-links`.
+- **Admin navigation**: Incident report tools are easier to reach from the main admin sidebar so teams can jump straight into link management after the initial rollout.
+- **Public report reliability**: The public submission flow is more resilient when the page updates or reloads, so users are less likely to lose context mid-report.
+- **Web submissions**: Browser-based submissions are attributed correctly as web traffic for clearer reporting and follow-up.
 
 ## Bug Fixes
 
-- Keep public incident report hooks stable
-- Set web device for public reports
+- **Public incident flow**: Addressed cases where hooks behind the public form could get out of sync, which could interrupt or confuse the submission experience.
+- **Device attribution**: Fixed how web visitors are labelled so analytics and downstream views stay consistent for public reports.

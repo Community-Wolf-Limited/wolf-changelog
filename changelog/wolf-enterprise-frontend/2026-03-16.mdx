@@ -1,19 +1,20 @@
 ---
-title: "Platform — 2026-03-16"
-description: "Updates merged to main on 2026-03-16."
+title: "Enterprise billing workspace, scoring follow-up, and routing auth"
+description: "A first-class enterprise billing workspace for subscription and special-access context, scoring and routing follow-ups from the March hex work, and cleaner authentication handling on safety routing."
 date: "2026-03-16"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.37"
 ---
 
 ## What's New
 
-- Add enterprise billing workspace
+- **Billing workspace**: Administrators get a dedicated area to review subscription status, paid-capability messaging, and who holds special access—so finance, security, and operations share the same picture without hunting through settings.
+- **Scoring and routing integration**: The scoring follow-up tightens the unified crime-hex client, adjusts the safety-routing hex detail drawer, and updates routing and precinct clients so hex scoring and precinct loading stay aligned after the March scoring push.
 
 ## Improvements
 
-- Release integration: `fix/scoring-v2`.
+- **Staging merges**: Staging integrations land the scoring fixes alongside the billing workspace so upgrades receive both in one pass.
 
 ## Bug Fixes
 
-- Remove unnecessary non-null assertion and improve safety-routing auth
+- **Safety routing authentication**: Removes brittle non-null assumptions and tightens auth handling so legitimate sessions are not rejected during routing transitions.

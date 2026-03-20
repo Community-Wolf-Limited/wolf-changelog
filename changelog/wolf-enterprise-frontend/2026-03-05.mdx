@@ -1,15 +1,15 @@
 ---
-title: "Platform — 2026-03-05"
-description: "Updates merged to main on 2026-03-05."
+title: "Admin users on small screens and invite flows"
+description: "Enterprise admin user management works better on narrow viewports, with clearer invite dialogs, search, and empty states—plus staging and performance integrations merged into main."
 date: "2026-03-05"
 tags: ["Enhancement", "Enterprise"]
-version: "1.0"
+version: "2.32"
 ---
 
 ## Improvements
 
-- Release integration: `feature/performance-optimizations`.
-
-## Bug Fixes
-
-- Responsive table, invite modal, search, empty states
+- **Responsive directory**: User tables adapt to tablet and phone widths with sensible column priorities and horizontal scroll where needed, so directory and role work is usable away from a large monitor.
+- **Invite experience**: The invite modal presents fields and validation feedback more clearly, reducing back-and-forth when onboarding administrators or operators.
+- **Search**: User search responds more predictably as you type and when combining filters, so large directories stay navigable during busy onboarding periods.
+- **Empty and edge states**: When no users match filters—or when the directory is genuinely empty—copy and actions explain what to do next instead of leaving a blank grid.
+- **Release integration**: Staging and performance-optimisation work is merged into the main line so environments pick up the latest platform fixes alongside these admin improvements.

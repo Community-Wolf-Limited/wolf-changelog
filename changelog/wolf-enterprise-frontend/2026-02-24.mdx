@@ -1,15 +1,17 @@
 ---
-title: "Platform — 2026-02-24"
-description: "Updates merged to main on 2026-02-24."
+title: "Crime hex grid and heat-style views on the live map"
+description: "Hex-based crime density and heat-style visualisation on the live map, with controls to tune how incidents appear alongside your existing layers."
 date: "2026-02-24"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enterprise"]
+version: "2.28"
 ---
 
 ## What's New
 
-- Add hexagon grid and crime heat map visualization
+- **Hex and heat visualisation**: The live map can show crime-related activity in hex cells with heat-style emphasis so teams can spot concentrations at a glance.
+- **Dedicated exploration**: A focused hex-grid experience lets analysts adjust colours and controls when reviewing patterns outside the main map chrome.
+- **Detail drawer**: Opening a cell surfaces more context in one place instead of jumping between disconnected panels.
 
 ## Improvements
 
-- Release integration: `feature/performance-optimizations`.
+- **Layer behaviour**: Map filters and stores stay aligned when hex views are toggled with your other live-map layers.

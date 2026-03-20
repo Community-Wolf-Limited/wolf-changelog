@@ -1,11 +1,13 @@
 ---
-title: "Platform — 2026-02-08"
-description: "Updates merged to main on 2026-02-08."
+title: "Faster group feeds and radar"
+description: "Smoother scrolling and loading for high-volume message feeds, calmer radar refreshes, and snappier licence-plate lookups when monitoring access control."
 date: "2026-02-08"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Enhancement", "Enterprise"]
+version: "2.18"
 ---
 
-## What's New
+## Improvements
 
-- Optimise feeds and radar UI
+- **Group message feeds**: Long-running feeds stay responsive when many messages are on screen—lists load in manageable batches and avoid unnecessary redraws so operators can keep scrolling without the interface stalling.
+- **Radar monitoring**: The radar view updates less aggressively when nothing material has changed, so the picture stays readable during busy periods.
+- **Licence plate views**: Plate-based lookups in access control benefit from the same performance pass, so repeated checks feel quicker during investigations.

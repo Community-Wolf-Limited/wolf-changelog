@@ -1,20 +1,21 @@
 ---
-title: "Platform — 2026-02-04"
-description: "Updates merged to main on 2026-02-04."
+title: "Smarter public incident steps and cleaner dashboard defaults"
+description: "A shorter public report path with suggested follow-up details and a clearer date-time step, plus fixes for group messaging exports and a tidier home dashboard."
 date: "2026-02-04"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.15"
 ---
 
 ## What's New
 
-- Add LLM prompts flow
+- **Guided detail prompts**: After someone describes an incident in their own words, the form can suggest additional details they might add—presented in plain language with a short loading state so expectations stay clear across supported languages.
+- **Streamlined steps**: The public incident flow drops a redundant incident-type screen so reporters move from location and timing to details and contact with fewer taps.
+- **Date and time picker**: A dedicated date-time control makes it easier to record when the incident happened without awkward manual entry.
 
 ## Improvements
 
-- **2** merges to main.
+- **Dashboard**: Report widgets are hidden by default on the main dashboard so the first view stays focused; noisy diagnostic logging is reduced for a calmer experience in normal use.
 
 ## Bug Fixes
 
-- Correct agent groups collection mapping
-- Correct agent groups export name
+- **Group messaging exports**: Fixed naming and collection wiring for exported group lists used in messaging workflows so the right data appears in exports and access checks stay aligned with your configuration.

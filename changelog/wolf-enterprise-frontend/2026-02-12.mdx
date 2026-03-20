@@ -1,22 +1,22 @@
 ---
-title: "Platform — 2026-02-12"
-description: "Alarm device locations and alerts, patrol and map refinements, and access control responsiveness."
+title: "Access control scale, patrol areas, and steadier public incident forms"
+description: "Faster access-control investigations at volume, clearer site areas and maps, and fixes for the public incident flow alongside patrol scheduling polish."
 date: "2026-02-12"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.20"
 ---
 
 ## What's New
 
-- **Alarm devices**: Locations and alerts views for enterprise devices.
-- **Patrol and maps**: Patrol and area map behaviour updates for clearer use on the ground.
-- **Device management**: Device user management tab where supported.
+- **Patrol and areas**: Site areas and map views use a clearer colour system and smoother map behaviour; patrol scheduling steps are easier to work through when building routes and timings.
+- **Access control at scale**: Filtering and plate-based views load more predictably under heavy use, with caching so returning to a tab does not feel like a cold start.
 
 ## Improvements
 
-- Release integration: `fix/access-control-backend-scale`.
-- **Access control**: Returning to a tab restores your place without long reloads.
+- **Live map and mini map**: Map widgets respond more reliably when panning and zooming around sites and patrol context.
+- **Incident report links**: Admin-facing link management stays aligned with the latest public incident form behaviour.
 
 ## Bug Fixes
 
-- **Access control**: Faster loading and more reliable behaviour at scale.
+- **Public incident form**: Resolved issues that could affect step state and incident classification on the public submission flow after recent layout changes.
+- **Access control stability**: Addressed edge cases in filter loading, timeouts, and row updates so long sessions stay usable during peak monitoring.

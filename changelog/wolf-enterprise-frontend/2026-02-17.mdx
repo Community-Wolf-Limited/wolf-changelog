@@ -1,16 +1,21 @@
 ---
-title: "Platform — 2026-02-17"
-description: "Updates merged to main on 2026-02-17."
+title: "Device management, alert triage, and POI on main"
+description: "Alarm and device management rejoins the production line alongside the new live-map POI work, with clearer alert triage and delivery visibility for messaging flows."
 date: "2026-02-17"
-tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.23"
 ---
 
 ## What's New
 
-- Prioritize board triage with recency and map context
-- Surface delivery failures in recent logs
+- **Integrated release**: The live-map places-of-interest work and the enterprise device workspace are merged into the same production path, so teams upgrading pick up both without juggling separate branches.
+- **Alert triage board**: Device and alert boards emphasise recent activity and map context so operators can see what needs attention first.
+- **Delivery visibility**: Alert-flow logs surface when messages fail to reach recipients, making it easier to spot configuration or routing issues early.
 
 ## Improvements
 
-- Release integration: `feature/alarm-kanban-staff-alerts`, `fix/alert-flows-multi-recipient-delivery`, `feature/poi`.
+- **Device workspace**: Locations, alerts, people-on-device, and live activity behave consistently with the rest of the February map and monitoring updates.
+
+## Bug Fixes
+
+- **Multi-recipient delivery**: Addressed cases where alert flows needed more reliable handling when multiple recipients are involved.

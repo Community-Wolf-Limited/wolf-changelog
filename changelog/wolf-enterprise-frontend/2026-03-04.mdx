@@ -1,17 +1,16 @@
 ---
-title: "Platform — 2026-03-04"
-description: "Updates merged to main on 2026-03-04."
+title: "Precinct boundaries and faster safety intent on the map"
+description: "Precinct boundaries stream in with visible progress, map-wide safety intent updates feel instant, and zoomed-out views load precinct context more efficiently."
 date: "2026-03-04"
 tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+version: "2.31"
 ---
 
 ## What's New
 
-- Optimize police precinct loading for zoomed-out viewports
-- Instant safety intent switching via single all-scores fetch
-- Stream precinct boundaries with progress UI
+- **Streaming boundaries**: Large precinct boundary sets load progressively with clear progress so the map stays usable instead of blocking on one big fetch.
 
 ## Improvements
 
-- Release integration: `feature/performance-optimizations`.
+- **Safety intent**: Switching safety intent on the map refreshes scores in one coordinated pass so the overlay and legend stay aligned.
+- **Zoomed-out views**: When you are far out on the map, precinct context loads with optimisations tuned for wide viewports.

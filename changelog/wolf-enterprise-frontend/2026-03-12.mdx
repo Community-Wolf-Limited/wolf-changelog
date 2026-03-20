@@ -1,15 +1,19 @@
 ---
-title: "Platform — 2026-03-12"
-description: "Updates merged to main on 2026-03-12."
+title: "Safety hex table, detail drawer, caches, and live-map POI streaming"
+description: "A safety-oriented hex table and detail drawer with scoring profiles and local caches, parallel streaming of community and standard map places on the live map, and updated map filters with safety path finder alignment."
 date: "2026-03-12"
 tags: ["Feature", "Enhancement", "Enterprise"]
-version: "1.0"
+version: "2.34"
 ---
 
 ## What's New
 
-- Add routing, hex detail drawer, full hex cache and live map POI streaming
+- **Safety hex table and routing**: Navigate hex-based safety analysis in a dedicated table view with resolution and scoring utilities that match the rest of the crime-hex model.
+- **Hex detail drawer**: Open a full detail drawer for a cell so analysts see scoring, modifiers, and context in one place instead of splitting attention across panels.
+- **Hex and simulation caches**: Dedicated stores keep hex crime data, simulation state, and scoring profiles available across steps so repeat lookups and what-if checks stay fast.
+- **Live-map places streaming**: Community and open map-sourced places load through a streamed, parallel fetch so dots appear as each source returns instead of blocking the whole map.
+- **Map filters and safety path finder**: Map filter state moves forward a generation alongside sidebar, dialog, and sheet updates so filters, layers, and the safety path finder stay coherent.
 
 ## Improvements
 
-- Release integration: `feat/safety-hex-routing-and-poi-stream`.
+- **Unified crime hex client**: Shared helpers for listing cells, pulling detail, and expressing safety intent keep the live map, safety flows, and hex tooling aligned.

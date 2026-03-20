@@ -1,16 +1,25 @@
 ---
-title: "Platform — 2026-03-18"
-description: "Updates merged to main on 2026-03-18."
+title: "Safety routing stability, scoring, and map data readiness"
+description: "Progressive loading for map-related local data, clearer place and overlay toggles, consistent neutral-intent scoring, updated risk-weight labels, and multiple fixes across safety routing and site validation."
 date: "2026-03-18"
-tags: ["Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.39"
 ---
+
+## What's New
+
+- **Risk layer labels**: Weight labels on risk-related map layers now match the current scoring architecture so what you read on the map matches the model behind it.
 
 ## Improvements
 
-- Release integration: `fix/site-validation-and-hex-streaming`, `feature/update-weight-labels`, `fix/none-intent-scoring`, `fix/idb-progress-remove-poi-osm`.
-- Safety Routing: fix MU crash, POI/OSM toggles, load org profile, reduce complexity, add doc
-- Update risk layer weight labels to match current architecture
-- Fix none intent, POI/OSM modifier sign, and scoring consistency
-- Fix none intent to show uniform green, boost POI/OSM toggle visibility
-- Add IndexedDB loading progress, hide POI/OSM toggles until data exists
+- **Release integration**: Several staging merges bundle site-validation work, scoring tweaks, map-loading progress, and access-control–related fixes so customers receive a coherent upgrade rather than piecemeal patches.
+- **Local map data loading**: While map-related data is prepared on the device, you see explicit progress instead of a frozen screen; controls for places and standard map overlays stay hidden until the underlying data is ready to use.
+- **Layer toggles**: Place and overlay toggles are easier to notice and use, including when only part of the stack has finished loading.
+- **Organisation context for routing**: Safety routing loads organisation profile data more reliably so route and overlay behaviour matches your tenant configuration.
+- **Safety routing complexity**: The routing screen is simplified to reduce confusing states and edge-case interactions during live use.
+
+## Bug Fixes
+
+- **Safety routing**: Addressed crashes in mixed map views when toggling overlays or switching modes quickly.
+- **Neutral intent scoring**: When no specific intent is selected, overlays use a consistent, uniform treatment; modifier signs and weights for place-related overlays are corrected for scoring consistency.
+- **Site and hex data**: Validation and streaming behaviour for site editing and large hex payloads are more reliable—fewer silent failures when saving sites or when data arrives in chunks.

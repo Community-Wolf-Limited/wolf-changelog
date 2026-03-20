@@ -1,15 +1,31 @@
 ---
-title: "Platform — 2026-03-20"
-description: "Updates merged to main on 2026-03-20."
+title: "Live map loading, crime hex viewport, safety routing, and staff maps"
+description: "Clearer loading for layers, precinct streams, and national hex on the live map; crime-hex viewport and filter state; safety-routing and precinct client polish; staff directory map fixes; client bootstrap and CI hardening."
 date: "2026-03-20"
-tags: ["Enhancement", "Enterprise"]
-version: "1.0"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.42"
 ---
+
+## What's New
+
+- **Named layer loading**: When multiple map layers are still loading, the UI calls out **which** layers are in flight (places, reports, crime hex, national hex, precincts) instead of a single generic spinner.
+- **Heavy vs light loading**: Large jobs—**precinct boundaries** or **national crime hex**—use a dedicated loading strip with status text; lighter combinations use a compact banner so the map stays readable during mixed load states.
+- **Crime hex viewport**: Shared helpers keep crime-density views aligned with what is on screen, reducing mismatches when you pan or zoom during analysis.
+- **Map filter state**: Filter state on the live map is extended so layer and analysis choices stay coherent when switching between dense and sparse viewports.
 
 ## Improvements
 
-- Release integration: `feature/layer-names-and-precincts-refactor`.
+- **Live map layer stack**: On `/map`, data layers follow a consistent bottom-to-top order—**national crime hex** at the base, then viewport crime hex and precincts, then heatmap and hotspot density, then report markers, with **POI symbols** on top—so overlays read predictably when multiple layers are on.
+- **Precinct streaming progress**: As precinct boundaries stream in, you see **loaded versus total** counts and a progress bar, and map geometry updates are batched so the interface stays responsive while batches apply.
+- **National hex progress**: National hex loads show how many cells are fetched, how many are on the map, and optional status text when the job is still warming up—so analysts know the difference between “still downloading” and “rendering.”
+- **Smoother precinct paint**: Precinct batches are scheduled into animation frames before hitting the map, reducing jank when many boundaries arrive in quick succession.
+- **Layer-name branch merges**: Follow-up merges complete the human-friendly layer and precinct refactor train, keeping map pages, crime-hex handling, and safety routing in sync with the March release series.
+- **Safety routing**: The safety-routing page is trimmed so the main map and controls stay in focus without extra chrome.
+- **Precinct and hex clients**: Calls that load precinct and cached boundary data are tightened so repeat visits reuse work and fail more gracefully when data is still warming up.
+- **Staff directory maps**: Map-backed cells in the staff directory handle icon loading more safely, including guarding against duplicate icon registration when lists re-render.
+- **Client bootstrap**: The app entry path reduces unnecessary telemetry from the map SDK during normal use and keeps icon loading predictable on staff views.
+- **Build and dependencies**: Tooling and dependency updates support the above fixes; an automated audit-fix workflow helps keep security patches on a predictable cadence.
 
 ## Bug Fixes
 
-- Resolve staff page Mapbox and iterable errors
+- **Staff pages**: Resolved iterable and map-icon errors that could break staff directory rows when skills or map data were in unexpected shapes.
