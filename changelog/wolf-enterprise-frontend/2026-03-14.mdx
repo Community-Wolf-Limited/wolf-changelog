@@ -1,0 +1,28 @@
+---
+title: "Platform — 2026-03-14"
+description: "Updates merged to main on 2026-03-14."
+date: "2026-03-14"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's New
+
+- Add 'None' overlay option for precinct choropleth
+- Use Go router for precinct loading
+- Hex-resolution, hex-scoring alignment, cw-unified-crime-hex-api
+
+## Improvements
+
+- Release integration: `fix/scoring-v2`.
+- Options object, baseUrlOverride for Go router
+- Extract useReportDetail, useReportDetailData, useReportComment hooks
+- Extract RadarMainContent and useRadarData hook
+- DataVisualisation, skillReport, skillType; refactor dataProcessor, exportGroupAgentCsv
+
+## Bug Fixes
+
+- Scoring v2 — consume Go ss, proportional POI, display labels
+- Bump DB version, clear stale Go cache on upgrade
+- Choropleth mapReady race, auto-enable boundaries
+- MiniMap, WidgetBarChart, WidgetTemplateDialog, ReportIntelligenceGraph, use-component-search
