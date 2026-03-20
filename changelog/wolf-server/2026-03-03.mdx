@@ -1,0 +1,23 @@
+---
+title: "Platform APIs — 2026-03-03"
+description: "Updates merged to main on 2026-03-03."
+date: "2026-03-03"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's New
+
+- Police precincts, SAPS crime stats, analytics scale plan, and pathfinding module
+- Propagate dateRange to all pipelines, parallelise queries, add indexes
+- Flagged vehicle stats, data quality fixes, snapshot versioning, parallelised compute
+- Add incident date tracking and report editing with audit trail
+
+## Improvements
+
+- Release integration: `feature/performance-optimizations`.
+
+## Bug Fixes
+
+- Restore pagination limit to 10000 for exports, wrap parse in try/catch
+- Handle overflow in passengers $toInt when field contains non-numeric data

@@ -1,0 +1,21 @@
+---
+title: "Platform APIs — 2026-02-05"
+description: "Updates merged to main on 2026-02-05."
+date: "2026-02-05"
+tags: ["Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## Improvements
+
+- Release integration: `feature/public-incident-report-links`.
+- Merge remote-tracking branch 'origin/staging'
+- Add auth context tracing for agent groups
+
+## Bug Fixes
+
+- Preserved platform roles set by authMiddleware so organisationOwnershipMiddleware no longer overwrites them with an empty array, which was starving AccessLevelService and causing 401s on Group Agents.
+- Propagate auth context to agent group scope
+- Fallback to organisation roles for platform access
+- Widen org id type in platform roles
+- Resolve auth context in org ownership
