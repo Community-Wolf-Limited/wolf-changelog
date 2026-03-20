@@ -1,21 +1,24 @@
 ---
-title: "Platform APIs — 2026-01-29"
-description: "Updates merged to main on 2026-01-29."
+title: "Emergency messaging, coverage, and connector email"
+description: "Stronger emergency conversation handling, coverage-related improvements, and plain-text connector email—plus tighter message ordering."
 date: "2026-01-29"
-tags: ["Feature", "Enhancement", "Enterprise"]
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
 version: "1.0"
 ---
 
 ## What's New
 
-- Add platform messaging and agent control
-- Add backend proxy for WhatsApp messages
-- Convert email sending from HTML to plain text
+- **Emergency workflows**: Platform messaging and agent controls support emergency scenarios with clearer handoff.
+- **Message path**: Backend support keeps third-party message flows aligned with platform expectations.
+- **Connector email**: Outbound connector mail uses plain text for broader client compatibility.
 
 ## Improvements
 
+- **Message ordering**: Emergency conversations list messages in a stable time order for accurate reading.
+- **Message tracking**: Conversation history stays in sync so teams see a single coherent thread.
 - Release integration: `coverage-fixes-dedup`.
 
 ## Bug Fixes
 
-- Sync message history and add platform flag
+- **Duplicates & sequencing**: Fewer duplicate location entries and better ordering in fast-moving emergency threads.
+- **History sync**: Message history reflects platform activity flags consistently.

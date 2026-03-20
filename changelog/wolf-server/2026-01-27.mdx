@@ -1,17 +1,19 @@
 ---
-title: "Platform APIs — 2026-01-27"
-description: "Updates merged to main on 2026-01-27."
+title: "Report viewing and connector test improvements"
+description: "Clearer default report views, better connector test coverage for staff-linked users, and fixes for filtering and sorting."
 date: "2026-01-27"
-tags: ["Enhancement", "Enterprise"]
+tags: ["Enhancement", "Bug Fix", "Enterprise"]
 version: "1.0"
 ---
 
 ## Improvements
 
+- **Default report view**: Reports show the full set by default instead of automatically narrowing to organisation areas unless you choose that filter.
+- **Verified filter**: Verified status only filters when you explicitly enable it.
+- **Connector testing**: Connector test flows include users linked through staff records so test sends match real access patterns.
 - Release integration: `general-fixes`.
 
 ## Bug Fixes
 
-- Include users linked via staff records in connector test dialog
-- Show all reports by default instead of auto-filtering by org areas
-- Only filter verified when set
+- **Report filtering**: Resolved cases where area filtering hid reports when users expected the full list.
+- **Sort behaviour**: More consistent ordering across report views and live updates.

@@ -1,6 +1,6 @@
 ---
-title: "Platform APIs — 2026-01-26"
-description: "Updates merged to main on 2026-01-26."
+title: "Email connectors and report intelligence"
+description: "Automated email connectors, report intelligence graphs, and patrol comment support—plus reliability fixes for reports and connectors."
 date: "2026-01-26"
 tags: ["Feature", "Enhancement", "Enterprise"]
 version: "1.0"
@@ -8,19 +8,20 @@ version: "1.0"
 
 ## What's New
 
-- Add test email endpoint
-- Add intelligence endpoints and alert counts
-- Add intelligence graph endpoints
-- Expand report graph and patrol comments
+- **Email connectors**: Configure automated emails from report events with organisation-specific templates and a safe way to send test messages before going live.
+- **Email templates**: Placeholders pull in organisation details so outbound mail stays on-brand.
+- **Report intelligence**: Explore report relationships with graphs and maps; see alert counts alongside intelligence views.
+- **Patrol comments**: Add notes to patrol events so teams keep clearer context for follow-up.
 
 ## Improvements
 
+- **Event flow**: More reliable processing and delivery for connector-triggered emails.
+- **Report context**: Intelligence views surface richer relationships between reports and alerts.
+- **Formatting**: Tidier report and route presentation across related views.
 - Release integration: `feature/connectors`, `feats/report-intel-and-fixes`.
-- Normalise report and route formatting
 
 ## Bug Fixes
 
-- Stabilise event flow
-- Resolve build typing errors
-- Add sortable timestamp to socket payloads
-- Add defensive filter to ensure users match organisationId
+- **Connectors**: Tighter filtering so emails only go to the right people for the organisation; staff-linked users are included where expected.
+- **Reports**: Reports list behaviour respects “show all” vs area filters; verified filters only apply when you turn them on.
+- **Real-time updates**: Socket payloads carry a sortable timestamp so live ordering stays consistent.

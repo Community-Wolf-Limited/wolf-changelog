@@ -1,20 +1,20 @@
 ---
-title: "Fear of Crime Survey Tool"
-description: "Backend support for geolocated safety perception surveys"
+title: "Safety surveys: collection, public links, and sharing"
+description: "Geolocated safety perception surveys, shareable anonymous links, short URLs, and abuse-aware link management."
 date: "2026-01-07"
-tags: ["Feature", "Enterprise"]
-version: "1.55"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.56"
 ---
 
 ## What's New
 
-- **Safety Survey Data Collection**: New capability to collect and store geolocated safety perception data from community surveys
-- **Geospatial Storage**: Survey locations are stored in a format optimized for mapping and proximity-based analysis
-- **Structured Concern Tracking**: Capture categorized observations like environmental issues and behavioral concerns alongside safety ratings
-- **Language Tracking**: Records which language the survey was displayed in for demographic insights
+- **Survey data collection**: Capture geolocated safety perception responses with structured concerns and language tracking.
+- **Public survey links**: Share anonymous survey links without login; create multiple named links per organisation for campaigns.
+- **Short URLs**: Friendly short links for social and print.
+- **Anonymous attribution**: Responses tie back to your organisation while respondents stay anonymous.
 
 ## Improvements
 
-- **Permission-Gated Access**: Survey submissions respect your organization's role-based access controls
-- **Standalone Architecture**: The survey module is self-contained for easy management and future migration options
-
+- **Permissions**: Submissions respect organisation role rules.
+- **Link management**: Enable, disable, or rotate links; rate limiting and risk-based verification reduce abuse.
+- **Standalone module**: Survey capability remains self-contained for easier operation and evolution.

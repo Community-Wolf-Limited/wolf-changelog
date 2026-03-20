@@ -1,12 +1,20 @@
 ---
-title: "Persistent Media in Reports"
-description: "Backend support for persistent media storage in skill reports"
+title: "Branding, access control media, and persistent report media"
+description: "Organisation branding for surveys, secure access-control imagery, and long-lived media links in skill reports."
 date: "2026-01-09"
-tags: ["Enhancement", "Enterprise"]
+tags: ["Feature", "Enhancement", "Security", "Enterprise"]
 version: "2.16"
 ---
 
+## What's New
+
+- **Brand configuration**: Organisations can save colours, logos, fonts, and styling; branding can be toggled independently of resets.
+- **Secure access-control images**: Time-limited URLs for access-control imagery with cleaner storage and metadata.
+- **Persistent media in reports**: Skill reports can carry durable media URLs so images and videos stay available over time.
+
 ## Improvements
 
-- **Persistent media links**: Added backend support for updating skill reports with permanent media URLs, ensuring images and videos remain accessible indefinitely
-- **Improved reliability**: Media attachments in reports are now stored with redundant, long-term accessible links
+- **Light-mode defaults**: Default palette aligns with the platform light theme.
+- **Flexible reset**: Resetting brand defaults keeps your enable/disable choice.
+- **Access-control migration**: Existing images move to the new delivery model without breaking older records.
+- **Report media reliability**: Attachments use redundant, long-term accessible links where applicable.
