@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Reads git log from wolf-safety-router origin/main and writes
- * changelog/wolf-safety-router/YYYY-MM-DD.mdx (user-facing bullets only; ops/CI noise skipped).
- * First run is a draft — edit MDX to remove any remaining internal detail before publishing.
+ * Reads git log from wolf-whatsapp-server origin/main and writes
+ * changelog/wolf-whatsapp-server/YYYY-MM-DD.mdx (user-facing bullets only; ops/CI noise skipped).
+ * Skips existing files — delete a date file to regenerate, then edit for external-facing copy.
  *
  * Usage:
- *   WOLF_SAFETY_ROUTER_ROOT=../wolf-safety-router node scripts/generate-wolf-safety-router-daily-from-git.mjs
+ *   WOLF_WHATSAPP_SERVER_ROOT=../wolf-whatsapp-server node scripts/generate-wolf-whatsapp-server-daily-from-git.mjs
  *
- * Defaults: CHANGELOG_SINCE=2026-03-01, CHANGELOG_UNTIL=2026-04-01 (UNTIL is exclusive — include the day after your last ship when extending the window).
+ * Defaults: CHANGELOG_SINCE=2026-01-01, CHANGELOG_UNTIL=2026-04-01 (UNTIL is exclusive).
  */
 import { execSync } from "node:child_process";
 import fs from "node:fs";
@@ -17,20 +17,21 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const REPO = path.resolve(
-  process.env.WOLF_SAFETY_ROUTER_ROOT ??
-    path.join(ROOT, "..", "wolf-safety-router")
+  process.env.WOLF_WHATSAPP_SERVER_ROOT ??
+    path.join(ROOT, "..", "wolf-whatsapp-server")
 );
-const OUT_DIR = path.join(ROOT, "changelog", "wolf-safety-router");
+const OUT_DIR = path.join(ROOT, "changelog", "wolf-whatsapp-server");
 
-const SINCE = process.env.CHANGELOG_SINCE ?? "2026-03-01";
+const SINCE = process.env.CHANGELOG_SINCE ?? "2026-01-01";
 const UNTIL = process.env.CHANGELOG_UNTIL ?? "2026-04-01";
 
-const TITLE_PREFIX = "Safety Router";
+const TITLE_PREFIX = "WhatsApp Server";
 
 function stripOrg(branch) {
   return branch
     .replace(/^Community-Wolf-Limited\//, "")
     .replace(/^MichaelHoughtonDeBox\//, "")
+    .replace(/^rhinoella\//, "")
     .trim();
 }
 
@@ -42,7 +43,7 @@ function gitLog() {
     );
   } catch (e) {
     console.error(
-      "git log failed — set WOLF_SAFETY_ROUTER_ROOT or clone wolf-safety-router next to wolf-changelog."
+      "git log failed — set WOLF_WHATSAPP_SERVER_ROOT or clone wolf-whatsapp-server next to wolf-changelog."
     );
     throw e;
   }
@@ -52,28 +53,22 @@ function dayKey(iso) {
   return iso.slice(0, 10);
 }
 
-/** Skip infra, CI, auth plumbing, and changelog policy noise — keep routing/scoring product outcomes. */
+/** Skip infra, CI, auth plumbing, and changelog policy noise — keep product outcomes. */
 function shouldSkipSubject(s) {
   const low = s.toLowerCase();
   if (/^merge branch /i.test(s)) return true;
   if (/^merge (feat|fix)\//i.test(s)) return true;
   if (/^deploy:/i.test(s)) return true;
-  if (/^routing:/i.test(s)) return true;
   if (/^ci:/i.test(s)) return true;
   if (/^chore(\(|:)/i.test(s)) return true;
+  if (/^style(\(|:)/i.test(s)) return true;
   if (/^build:/i.test(s)) return true;
   if (/^docs(\(|:)/i.test(s)) return true;
   if (/^refactor(\(|:)/i.test(s)) return true;
-  if (/^perf(\(|:)/i.test(s) && /dijkstra|cubic|tier cost/i.test(low)) return true;
-  if (/^add readme|^add readme,/i.test(s)) return true;
-  if (
-    /hetzner|github rollback|workflow_dispatch|scp |ssh |dockerfile|golang|gmemlimit|oom|skip_v2|skip v2|clerk|jwks|jwt|mongodb|mongo|sonarlint|cors_origins|write_timeout|request_timeout|nginx|persistent disk|render\.yaml|zero-ram|health wait|container logs|github api|node 24|powershell|cmd one-liner/i.test(
-      low
-    )
-  )
+  if (/^test(\(|:)/i.test(s)) return true;
+  if (/^fix\(build\)|^fix\(types\)|ts2347|untyped function/i.test(low)) return true;
+  if (/lambda|mongodb long|s3 backfill|migrate.*script|workspace config/i.test(low))
     return true;
-  if (/^fix:/i.test(s) && /latlng|tofloatval|communityreports build/i.test(low)) return true;
-  if (/^osm-by-hex|^ci: opt into node/i.test(s)) return true;
   return false;
 }
 
@@ -145,7 +140,7 @@ function buildDayDoc(day, lines) {
   }
 
   const title = `${TITLE_PREFIX} — ${day}`;
-  const desc = `Routing and safety scoring updates merged to main on ${day}.`;
+  const desc = `WhatsApp backend updates merged to main on ${day}.`;
 
   const tags =
     whatsNew.length > 0

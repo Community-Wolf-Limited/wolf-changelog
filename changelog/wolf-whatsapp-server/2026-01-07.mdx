@@ -1,0 +1,18 @@
+---
+title: "Media reliability and prompt updates"
+description: "Safer handling of failed media uploads, clearer file metadata, and agent prompt improvements shipped to main."
+date: "2026-01-07"
+tags: ["Enhancement", "Bug Fix", "Enterprise"]
+version: "1.0"
+---
+
+## Improvements
+
+- **Agent prompts**: Conversation templates updated alongside the merged prompt-improvements work.
+- **Media integrity**: Skill reports no longer retain empty media references when an upload does not complete successfully.
+- **Metadata**: File size and related fields are normalized consistently for downstream processing.
+- **Optional backfill**: Maintenance tooling added for reconciling older media records where needed.
+
+## Bug Fixes
+
+- **Upload edge cases**: Hardening around partial or failed media transfers.

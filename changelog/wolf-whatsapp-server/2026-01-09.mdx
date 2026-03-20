@@ -1,13 +1,12 @@
 ---
-title: "Persistent Media in Reports"
-description: "Media in skill reports now uses persistent storage, ensuring images and videos remain accessible long-term"
+title: "Persistent media in skill reports"
+description: "Media attachments stored with skill reports and leaner message persistence for long-running chats."
 date: "2026-01-09"
-tags: ["Enhancement", "Enterprise"]
-version: "2.16"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
 ---
 
-## Improvements
+## What's New
 
-- **Persistent media links**: Images and videos in skill reports now use permanent storage URLs instead of temporary links that could expire
-- **Optimised message storage**: Reduced storage footprint for messages with media attachments, improving database efficiency
-- **Automatic media sync**: Skill reports are now automatically updated with persistent media links once processing completes
+- **Durable attachments**: Media linked to skill reports is kept in a form that survives retries and replays.
+- **Storage efficiency**: Message history layout adjusted to reduce redundant data for high-volume threads.

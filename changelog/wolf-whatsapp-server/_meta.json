@@ -1,0 +1,5 @@
+{
+  "displayName": "WhatsApp Server",
+  "order": 66,
+  "description": "Backend for WhatsApp agent flows: media, skill reports, voice, and LLM-powered insights."
+}

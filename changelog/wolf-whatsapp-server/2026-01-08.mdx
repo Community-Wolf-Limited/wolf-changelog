@@ -1,0 +1,15 @@
+---
+title: "In-service media pipeline"
+description: "Media uploads move onto the same hosted stack as the WhatsApp backend for simpler operations and faster iteration."
+date: "2026-01-08"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's New
+
+- **Unified media path**: Images and files are accepted and processed by the application service directly instead of relying on a separate upload worker.
+
+## Improvements
+
+- **Queues and throughput**: Tweaks to background handling so bursts of media don’t stall conversations.
