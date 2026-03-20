@@ -1,0 +1,15 @@
+---
+title: "Stability, HTTPS, and routing refinements"
+description: "Cross-origin and HTTPS hardening, memory and timeout tuning for large responses, safer deploy rollbacks, and clearer route behaviour."
+date: "2026-03-17"
+tags: ["Enhancement", "Bug Fix", "Enterprise"]
+version: "1.0"
+---
+
+## Improvements
+
+- **Browser access**: CORS and HTTPS settings aligned so web apps can call the service reliably in production.
+- **Large payloads**: Timeouts tuned for very large aggregate responses so clients don’t fail mid-request.
+- **Memory**: Safer default limits on constrained hosts to reduce out-of-memory restarts during heavy workloads.
+- **Routing**: Wider initial search corridor and clearer road-only behaviour; optional toggles documented for operators.
+- **Operations**: Deploy pipeline improvements with health checks and rollback paths when a release misbehaves.

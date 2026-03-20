@@ -1,0 +1,5 @@
+{
+  "displayName": "Safety Router",
+  "order": 65,
+  "description": "Go routing service for safer paths, hex-based scoring, and platform integrations."
+}

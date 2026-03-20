@@ -1,0 +1,20 @@
+---
+title: "Scoring weights, community context, and engine modes"
+description: "Tunable safety weights, community incident context in the hex graph, optional second-stage engine, and tighter scoring fixes."
+date: "2026-03-18"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "1.0"
+---
+
+## Improvements
+
+- **Community context**: Incident reports can be loaded at startup and merged into the hex graph for richer analysis.
+- **Scoring weights**: Report, POI, and area context weights are tunable and wired consistently across scoring modes.
+- **Configuration**: External configuration can drive scoring behaviour without code changes where supported.
+- **Engine modes**: Optional second-stage engine can be enabled selectively; startup is staged to reduce peak memory use on smaller instances.
+- **Cache layout**: Memory-efficient cache structure for large hex datasets.
+
+## Bug Fixes
+
+- **Scoring**: Corrected weight application and modifier sign handling in edge cases.
+- **Quality**: Test and validation fixes for routing and scoring pipelines.

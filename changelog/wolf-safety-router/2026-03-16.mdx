@@ -1,0 +1,18 @@
+---
+title: "Hosted deployment and resilient cache"
+description: "Production-style hosting with secure access, graceful cache behaviour when data stores are unavailable, and optional automated cache refresh."
+date: "2026-03-16"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's New
+
+- **Signed-in hosting**: Deployment configuration aligned with standard platform authentication for protected environments.
+- **Cache bootstrap**: Optional automatic download of hex cache data on startup for faster cold starts.
+- **Private artefacts**: Support for authenticated download of cache packages from private release storage when configured.
+
+## Improvements
+
+- **Resilience**: Service continues with sensible cache fallbacks when the primary data store is temporarily unavailable.
+- **Health checks**: Single consolidated health registration for monitors and load balancers.
