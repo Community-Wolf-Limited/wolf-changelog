@@ -1,0 +1,23 @@
+---
+title: "Maps, builds, and field reliability"
+description: "Stable mapping without paid map keys, clearer GPS errors, production-oriented builds, and icon polish on both platforms."
+date: "2026-03-13"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "1.0"
+---
+
+## What's New
+
+- **Open mapping**: Android uses an open map layer so map startup doesn’t depend on vendor keys; the map stack moves to MapLibre with community tile sources—**no paid map API keys** required for the default setup.
+- **Device support**: Minimum Android version raised so the current JavaScript engine and maps run reliably on supported hardware.
+
+## Improvements
+
+- **Builds**: Preview and production build settings aligned with hosted environment variables; CI runs **Android and iOS** with separate steps for clearer logs when something fails.
+- **API routing**: Backend base URL is normalized for packaged builds so client calls reach the correct API surface.
+- **Branding**: Home-screen icon padding adjusted so the mark fits cleanly on iOS and Android launchers.
+
+## Bug Fixes
+
+- **Maps**: Restored a stable map provider path on Android where the previous choice could crash on startup.
+- **GPS & forms**: Location permission and accuracy failures surface clearer messages when creating sites and routes.
