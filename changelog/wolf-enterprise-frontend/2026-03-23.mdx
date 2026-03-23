@@ -1,0 +1,21 @@
+---
+title: "Organisation roles at creation, resilient POI loading, and billing-aware navigation"
+description: "Admins can assign organisation feature roles while creating or editing an org; the live map recovers more gracefully when POI data cannot stream; billing entitlements can gate intelligence areas of the app with a dedicated billing experience."
+date: "2026-03-23"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.43"
+---
+
+## What's New
+
+- **Organisation roles in the admin dialog**: When you create or edit an organisation under **Admin → Organisations**, you can tick which **feature-access roles** apply immediately—so new clients are not left without capabilities until someone remembers **Feature Access**. A short note in the dialog points there for later changes.
+- **Billing and entitlements**: Intelligence-heavy sections of the product can respect **subscription entitlements**, with a **Billing** area in settings and clearer behaviour when a feature is not included in the current plan.
+
+## Improvements
+
+- **Live map POI loading**: If progressive POI loading cannot complete (for example when the browser receives an unexpected response), the map **falls back to a standard data request** so points of interest can still appear instead of failing silently.
+- **POI requests**: POI streaming uses the **configured API base** consistently and treats non-data responses more safely so the map does not misread errors as empty data.
+
+## Bug Fixes
+
+- **Admin organisations**: Saving create/update no longer omits role assignment when you use the dialog; errors from the server are logged for support while users still see a clear toast.
