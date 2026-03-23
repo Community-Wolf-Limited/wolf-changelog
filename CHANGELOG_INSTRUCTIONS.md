@@ -35,6 +35,26 @@ Use the release date: `YYYY-MM-DD.mdx`
 
 For multiple releases on the same day: `2025-01-15-hotfix.mdx`
 
+## Repository and calendar-day boundaries
+
+Public entries live in **this repo** under `changelog/<product>/` (one folder per upstream product, e.g. `wolf-server`, `wolf-community-frontend`).
+
+- **Separate by repository**: never put two products in one MDX file. Same calendar date in two folders (two files) is correct.
+- **Separate by day**: prefer **one MDX per product per calendar day** (`YYYY-MM-DD.mdx`). The date should match when the work landed on the **default branch** you are summarising (use one consistent timezone for the team, e.g. commit date in UTC).
+- **Catch-up spanning multiple days** (same product): either add **one file per day** (preferred when there is enough to say each day), or use a single file with explicit **daily subheadings** so the list is scannable:
+
+```mdx
+### Friday, 2026-03-20
+
+- Bullet list for that day only
+
+### Monday, 2026-03-23
+
+- Bullet list for that day only
+```
+
+- **Same product, multiple ships in one day**: use a suffix file, e.g. `2025-01-15-hotfix.mdx`.
+
 ## MDX File Structure
 
 ### Required Frontmatter
