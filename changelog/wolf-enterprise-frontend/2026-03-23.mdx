@@ -1,6 +1,6 @@
 ---
 title: "Organisation roles at creation, resilient POI loading, and billing-aware navigation"
-description: "Admins can assign organisation feature roles while creating or editing an org; the live map recovers more gracefully when POI data cannot stream; billing entitlements can gate intelligence areas of the app with a dedicated billing experience."
+description: "New and updated organisations receive full feature access automatically from the admin dialog; the live map recovers more gracefully when POI data cannot stream; billing entitlements can gate intelligence areas with a dedicated billing experience."
 date: "2026-03-23"
 tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
 version: "2.43"
@@ -8,7 +8,7 @@ version: "2.43"
 
 ## What's New
 
-- **Organisation roles in the admin dialog**: When you create or edit an organisation under **Admin → Organisations**, you can tick which **feature-access roles** apply immediately—so new clients are not left without capabilities until someone remembers **Feature Access**. A short note in the dialog points there for later changes.
+- **Automatic full access for organisations**: Under **Admin → Organisations**, creating or updating an organisation **applies every configured feature-access role** in one step—no checklist—so new clients start with full capability. The dialog explains this and links to **Feature Access** if you need to **narrow** access for specific organisations later.
 - **Billing and entitlements**: Intelligence-heavy sections of the product can respect **subscription entitlements**, with a **Billing** area in settings and clearer behaviour when a feature is not included in the current plan.
 
 ## Improvements
@@ -18,4 +18,4 @@ version: "2.43"
 
 ## Bug Fixes
 
-- **Admin organisations**: Saving create/update no longer omits role assignment when you use the dialog; errors from the server are logged for support while users still see a clear toast.
+- **Admin organisations**: Save stays disabled until roles have loaded so create/update always sends a complete role set; server errors are logged and surfaced with a clear toast.
