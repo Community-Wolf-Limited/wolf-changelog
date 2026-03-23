@@ -1,0 +1,26 @@
+---
+title: "Live map parity, clearer loading, and safer public layers"
+description: "Community live map moves closer to the enterprise experience: clearer loading, national crime insight layers that behave reliably, streamlined toggles, and small interaction fixes."
+date: "2026-03-23"
+tags: ["Feature", "Enhancement", "Bug Fix", "Free"]
+version: "1.0"
+---
+
+## What's New
+
+- **Enterprise-aligned map**: Layer behaviour, safety overlays, and hex colouring are brought in line with the enterprise live map so community and business views feel consistent.
+- **National crime insight**: Large-area crime hex layers load with clearer progress and work reliably in the browser by loading through the app’s own infrastructure instead of calling third-party origins directly.
+- **Loading feedback**: While heavy layers are fetching, the map explains what is still loading and can hold unrelated toggles steady so you are not left guessing whether the map is stuck.
+
+## Improvements
+
+- **Layer stack**: The order of map layers is rationalised so overlays (reports, heat-style views, points of interest) read predictably when several are on at once.
+- **Production networking**: In production, map and data requests use the app’s hosted paths so sessions are less likely to hit browser security limits during normal browsing.
+- **Zoom and pan**: Maximum zoom is aligned with the enterprise map so report detail and neighbourhood context match expectations.
+- **Tooltips**: Tooltips on map controls render above the map and avoid clipping or fighting with the map surface.
+- **Defaults**: Some experimental or redundant layer options are removed or hidden so the default experience stays focused on what most residents use.
+
+## Bug Fixes
+
+- **Map configuration**: Removed invalid assignments to read-only map SDK settings when tightening telemetry handling.
+- **Environment handling**: Local development and production base URLs for safety and map services are resolved more predictably.

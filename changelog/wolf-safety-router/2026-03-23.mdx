@@ -1,0 +1,18 @@
+---
+title: "Public map access, enterprise rate limits, and CORS hardening"
+description: "Clearer rules for which public map endpoints stay open without a session, stricter allowed web origins for public data, and rate limits tuned for enterprise clients."
+date: "2026-03-23"
+tags: ["Security", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## Improvements
+
+- **Public map configuration**: Read-only configuration used by the public safety map can be fetched without signing in, while authenticated traffic still follows normal access rules.
+- **Allowed origins**: Responses that serve public hex and map data are restricted to trusted Community Wolf web properties instead of accepting arbitrary browser origins.
+- **Enterprise traffic**: Rate limiting distinguishes enterprise clients from anonymous use so legitimate dashboards and integrations are less likely to be throttled during normal load.
+
+## Bug Fixes
+
+- **Auth middleware**: Fixes ensure public configuration requests are not incorrectly blocked by authentication checks.
+- **Lint and quality**: Minor cleanup in routing and CORS-related code paths for maintainability.
