@@ -45,11 +45,12 @@ No new commits on origin in this window (local check after fetch):
   wolf-brain, wolf-docs, wolf-whatsapp-server — no diff files.
 
 wolf-changelog MDX for this period:
-  changelog/wolf-community-frontend/2026-03-23.mdx
+  changelog/wolf-community-frontend/2026-03-23.mdx (map parity) + 2026-03-24.mdx + 2026-03-25.mdx (no-ship pointers)
   changelog/wolf-safety-router/2026-03-23.mdx
   changelog/wolf-server/2026-03-23.mdx (through 03-25)
   changelog/wolf-enterprise-frontend/2026-03-23.mdx (through 03-25)
   changelog/wolf-patrol-app/2026-03-24.mdx (through 03-25)
+  changelog/wolf-whatsapp-server/2026-03-25.mdx (no commits on main in this window — informational)
 
 Regenerate (from repo roots):
   git fetch origin main   # or master for patrol-helper
