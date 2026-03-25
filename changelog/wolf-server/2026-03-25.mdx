@@ -18,3 +18,8 @@ version: "1.0"
 - **Notable commits**: `bd1ab73` (patrol-stats / upcoming gating / patrol-events breadcrumbs), `7bc0a3a` (staff live positions, heartbeat API, grant tracking mode).
 - **Schema and modules** (from diff summary): new **`staff-live-position`** schema, expanded **patrol schedule** and related **patrol route/site** schemas, supporting **staff** repository and **middleware** updates.
 - **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-server-full.diff` (cumulative from `3a0ad45^..origin/main`).
+
+## Follow-up (device patrol schedules and assignments)
+
+- **Device schedule create (`POST /device-auth/patrol-schedules`)**: Safer parsing of `startDatetime` / `endDatetime` (string, number, or `Date` only — no arbitrary object stringification), optional **`useTimeRange`** with **`startTime`** / **`endTime`** (HH:MM), and refactors (**`parseDeviceScheduleCreateBody`**, **`parseScheduleTimeRange`**) to satisfy lint complexity rules.
+- **Device patrol create (`POST /device-auth/patrols`)**: For **`own_device_created`** grants, the **route** must belong to the requesting device user (**`createdByStaffId`**), enforced via **`findPatrolRouteForDeviceCreate`**.

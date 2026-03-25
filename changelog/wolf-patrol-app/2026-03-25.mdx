@@ -19,3 +19,9 @@ version: "1.2"
 
 - **Commits on `master`**: `d1c2f55`, `e7ef414`, `d1d8723` (2026-03-25).
 - **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-patrol-app-full.diff` (cumulative from `78529d0^..origin/master`).
+
+## Follow-up (route creation and maps)
+
+- **Route create**: After a successful create, **success haptics**, navigation to **`/route/{id}?created=1`**, and a **route detail** banner confirming the saved name.
+- **`MapViewSafe` / web**: Namespace import for **MapLibre** (non-deprecated default export), **`MapMarkerVariant`** including **`dot`**, **readonly** marker props, **`replaceAll`** for stable marker ids, and **`MapMarkerVariant`** type alias on web.
+- **Schedules API**: **`CreatePatrolScheduleInput`** extended with optional **`useTimeRange`**, **`startTime`**, **`endTime`** for device schedule creation.

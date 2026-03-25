@@ -16,3 +16,7 @@ version: "2.45"
 - **Merge commits on `main`**: `305d9f4` (**PR #75**), `77e7ada` (**PR #76**).
 - **Notable commits**: `65d70c2` (Live tab / staff map / trails), `9827b2f` (field access live map + staff heartbeat socket).
 - **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-enterprise-frontend-full.diff` (cumulative range as for 2026-03-24 — `ef702d9^..origin/main`).
+
+## Follow-up (live tracking map)
+
+- **`LiveTrackingTab`**: Persistent **`Map<staffId, Marker>`** markers with **`setLngLat`** updates, **initial fit once** (not on every GPS tick), **Fit all** control, and map teardown cleanup that snapshots the markers map at effect start for **eslint `react-hooks/exhaustive-deps`** compliance.
