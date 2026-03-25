@@ -37,3 +37,13 @@ version: "1.2"
 ## Engineering reference (patrol assignments ship)
 
 - **Commit on `master`**: `ca96e96` (assignments tab, edit flow, patrol API client, socket tuning).
+
+## Follow-up (four-tab navigation and access hardening)
+
+- **Simpler navigation**: **Home**, **Places** (routes and sites in one place), **Patrol** (assignments and schedules together), and **More** (field access and account) replace a long row of separate tabs.
+- **Stricter lock when you lack access**: The app keeps you in **field access** and **More** until you are approved, with a full-screen prompt so you are not browsing sensitive lists without permission.
+- **Smoother errors and refresh**: Clearer error messages when something fails, and more reliable pull-to-refresh behaviour on field access and lists.
+
+## Engineering reference (patrol nav and lock ship)
+
+- **Branch**: `feat/patrol-tabs-security-nav` — includes tab restructure, grant overlay ordering, pathname guard, hidden legacy `assignments` redirect, and follow-up Sonar cleanups.

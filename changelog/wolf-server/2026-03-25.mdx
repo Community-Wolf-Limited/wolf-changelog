@@ -32,3 +32,12 @@ version: "1.0"
 ## Engineering reference (device patrol updates ship)
 
 - **Commit on `feat/patrol-field-audit-device-writes`**: `5d1cf92` (device patrol updates, audit, GPS socket handler extraction, live-position wiring).
+
+## Follow-up (field access enforcement by default)
+
+- **Device field configuration**: The platform now expects **approved field access** on patrol devices **by default** before staff can use organisation patrol configuration and related data through the device API.
+- **Legacy deployments**: Organisations that still need an older “open” device mode should align with their deployment team to opt in explicitly so behaviour stays intentional.
+
+## Engineering reference (secure-default enforcement)
+
+- **Branch**: `feat/patrol-grant-secure-default` — secure-by-default patrol grant enforcement with documented legacy opt-out for operators.
