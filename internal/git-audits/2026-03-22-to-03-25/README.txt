@@ -8,8 +8,8 @@ Workspace root "normal wolf" contains these git repos (each folder has its own .
   wolf-docs
   wolf-enterprise-frontend
   wolf-patrol-app   (remote: patrol-helper; default branch: master)
-  wolf-safety-router
-  wolf-server
+  wolf-safety-router   (Go)
+  wolf-server   (Node)
   wolf-whatsapp-server
 
 These files are raw `git diff` outputs from local clones against `origin` at export time.
@@ -35,9 +35,10 @@ wolf-community-frontend (branch: main)
   All commits in this window landed on 2026-03-23 (no 03-24/03-25 commits on main).
   File: wolf-community-frontend-full.diff (~168 KB)
 
-wolf-safety-router (branch: main)
+wolf-safety-router (branch: main) — Go codebase
   Range: 95b7d9d^..origin/main
   First commit in window (since 2026-03-22): 95b7d9d — fix(auth): exempt GET /hexes/all and /hexes/config from auth
+  Follow-ups: 28c0f7b (CORS to *.communitywolf.com), 9dd60a3 (enterprise rate limits + auth/CORS refactors).
   All commits in this window landed on 2026-03-23.
   File: wolf-safety-router-full.diff (~11 KB)
 
@@ -46,7 +47,7 @@ No new commits on origin in this window (local check after fetch):
 
 wolf-changelog MDX for this period:
   changelog/wolf-community-frontend/2026-03-23.mdx (map parity) + 2026-03-24.mdx + 2026-03-25.mdx (no-ship pointers)
-  changelog/wolf-safety-router/2026-03-23.mdx
+  changelog/wolf-safety-router/2026-03-23.mdx (Go service) + 2026-03-24.mdx + 2026-03-25.mdx (no-ship pointers)
   changelog/wolf-server/2026-03-23.mdx (through 03-25)
   changelog/wolf-enterprise-frontend/2026-03-23.mdx (through 03-25)
   changelog/wolf-patrol-app/2026-03-24.mdx (through 03-25)
