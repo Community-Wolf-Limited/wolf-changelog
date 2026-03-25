@@ -1,0 +1,17 @@
+---
+title: "Startup reliability and release 1.1"
+description: "Clear on-launch error messages with recovery steps, font-load recovery, and version bump."
+date: "2026-03-26"
+tags: ["Enhancement", "Reliability", "Patrol"]
+version: "1.3"
+---
+
+## What's New
+
+- **Startup errors**: If the app **can’t reach the server** during sign-in, you see a **plain-language explanation**, **what to try** (network, signal, switching networks), and a **Try again** action instead of a silent failure.
+- **Font loading**: If **bundled fonts** fail to load, you get **guidance** and **Try again** (or close and reopen the app) instead of a blank or crashed screen.
+- **Release**: App version **1.1.0** (package and store metadata).
+
+## Reliability
+
+- **Session check** distinguishes **connectivity problems** from an **invalid or expired session**, so offline users aren’t left guessing.
