@@ -1,0 +1,317 @@
+diff --git a/.gitignore b/.gitignore
+index f5a2d7b..0fa60f8 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -10,6 +10,7 @@ hex-dump.json.gz
+ 
+ # Large boundary data (exceeds GitHub 100MB limit)
+ hex-boundaries.json.gz
++*.osm.pbf
+ 
+ # Env with secrets
+ .env
+diff --git a/cmd/server/auth_test.go b/cmd/server/auth_test.go
+index c418229..a7c9e49 100644
+--- a/cmd/server/auth_test.go
++++ b/cmd/server/auth_test.go
+@@ -17,8 +17,12 @@ import (
+ )
+ 
+ const (
+-	testEndpoint = "/hexes/config"
+-	testKID      = "test-1"
++	testEndpoint        = "/hexes/config"
++	testKID             = "test-1"
++	testHexesAll        = "/hexes/all"
++	testOriginCW        = "https://communitywolf.com"
++	testOriginMap       = "https://map.communitywolf.com"
++	headerAllowOrigin   = "Access-Control-Allow-Origin"
+ )
+ 
+ func TestParseAPIKeys(t *testing.T) {
+@@ -245,6 +249,58 @@ func TestAuthMiddlewareAPIFallbackWhenJWTInvalid(t *testing.T) {
+ 	}
+ }
+ 
++func TestAuthMiddlewareHexesAllPublic(t *testing.T) {
++	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
++	h := authMiddleware([]string{"secret"}, nil, ok)
++
++	req := httptest.NewRequest(http.MethodGet, testHexesAll, nil)
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusOK {
++		t.Errorf("GET %s (no auth): got %d, want 200", testHexesAll, rec.Code)
++	}
++}
++
++func TestAuthMiddlewareHexesConfigPublic(t *testing.T) {
++	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
++	h := authMiddleware([]string{"secret"}, nil, ok)
++
++	req := httptest.NewRequest(http.MethodGet, testEndpoint, nil)
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusOK {
++		t.Errorf("GET %s (no auth): got %d, want 200", testEndpoint, rec.Code)
++	}
++}
++
++func TestAuthMiddlewarePostHexesAllStillRequiresAuth(t *testing.T) {
++	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
++	h := authMiddleware([]string{"secret"}, nil, ok)
++
++	req := httptest.NewRequest(http.MethodPost, testHexesAll, nil)
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusUnauthorized {
++		t.Errorf("POST %s (no auth): got %d, want 401", testHexesAll, rec.Code)
++	}
++}
++
++func TestAuthMiddlewareOtherPathStillRequiresAuth(t *testing.T) {
++	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
++	h := authMiddleware([]string{"secret"}, nil, ok)
++
++	req := httptest.NewRequest(http.MethodGet, "/hexes/score", nil)
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, req)
++
++	if rec.Code != http.StatusUnauthorized {
++		t.Errorf("GET /hexes/score (no auth): got %d, want 401", rec.Code)
++	}
++}
++
+ func TestParseCorsOrigins(t *testing.T) {
+ 	got := parseCorsOrigins(" a , b , c ")
+ 	if len(got) != 3 {
+@@ -254,3 +310,61 @@ func TestParseCorsOrigins(t *testing.T) {
+ 		t.Errorf("got %q", got)
+ 	}
+ }
++
++func TestIsOriginAllowed(t *testing.T) {
++	exact := map[string]bool{
++		testOriginCW:           true,
++		"http://localhost:8080": true,
++	}
++	wildcards := []string{".communitywolf.com"}
++
++	tests := []struct {
++		origin string
++		want   bool
++	}{
++		{testOriginCW, true},
++		{testOriginMap, true},
++		{"https://platform.communitywolf.com", true},
++		{"https://preview-investors.communitywolf.com", true},
++		{"http://localhost:8080", true},
++		{"https://evil.com", false},
++		{"https://notcommunitywolf.com", false},
++		{"https://communitywolf.com.evil.com", false},
++		{"", false},
++	}
++
++	for _, tt := range tests {
++		got := isOriginAllowed(tt.origin, exact, wildcards)
++		if got != tt.want {
++			t.Errorf("isOriginAllowed(%q) = %v, want %v", tt.origin, got, tt.want)
++		}
++	}
++}
++
++func TestCorsMiddlewareWildcard(t *testing.T) {
++	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
++	h := corsMiddleware([]string{"https://*.communitywolf.com", testOriginCW}, ok)
++
++	req := httptest.NewRequest(http.MethodGet, testHexesAll, nil)
++	req.Header.Set("Origin", testOriginMap)
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, req)
++
++	if got := rec.Header().Get(headerAllowOrigin); got != testOriginMap {
++		t.Errorf("CORS: got %q, want %s", got, testOriginMap)
++	}
++}
++
++func TestCorsMiddlewareRejectsUnknown(t *testing.T) {
++	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
++	h := corsMiddleware([]string{"https://*.communitywolf.com"}, ok)
++
++	req := httptest.NewRequest(http.MethodGet, testHexesAll, nil)
++	req.Header.Set("Origin", "https://evil.com")
++	rec := httptest.NewRecorder()
++	h.ServeHTTP(rec, req)
++
++	if got := rec.Header().Get(headerAllowOrigin); got != "" {
++		t.Errorf("CORS should be empty for unknown origin, got %q", got)
++	}
++}
+diff --git a/cmd/server/main.go b/cmd/server/main.go
+index 0f9f455..6f0b839 100644
+--- a/cmd/server/main.go
++++ b/cmd/server/main.go
+@@ -193,7 +193,7 @@ func buildMiddlewareChain(mux *http.ServeMux) http.Handler {
+ 		log.Printf("API key auth enabled (%d key(s))", len(apiKeys))
+ 	}
+ 	jwksKeyfunc := initClerkJWKS()
+-	origins := parseCorsOrigins(getEnv("CORS_ORIGINS", "http://localhost:8080,http://localhost:8081,http://localhost:8082,http://localhost:8083,http://localhost:5173,http://127.0.0.1:8080,http://127.0.0.1:5173"))
++	origins := parseCorsOrigins(getEnv("CORS_ORIGINS", "http://localhost:8080,http://localhost:8081,http://localhost:8082,http://localhost:8083,http://localhost:5173,http://localhost:5174,http://127.0.0.1:8080,http://127.0.0.1:5173,http://127.0.0.1:5174,https://*.communitywolf.com,https://communitywolf.com"))
+ 	rateLimitCfg := ratelimit.DefaultConfig()
+ 	if n := getEnv("RATE_LIMIT_PER_MIN_UNAUTH", ""); n != "" {
+ 		if v, err := strconv.Atoi(n); err == nil && v > 0 {
+@@ -675,8 +675,18 @@ func parseAPIKeys(raw string) []string {
+ 	return out
+ }
+ 
++// publicReadPaths lists GET-only endpoints that are accessible without auth.
++// These serve read-only public data (SA crime hex statistics, color config).
++var publicReadPaths = map[string]bool{
++	"/health":      true,
++	"/hexes/all":   true,
++	"/hexes/config": true,
++}
++
+ // authMiddleware accepts EITHER a valid Clerk JWT OR a valid API key via Bearer/X-API-Key.
+-// /health is always exempt. When both keys and jwks are empty, all requests are allowed.
++// Public read-only paths (see publicReadPaths) are exempt but still check credentials
++// when provided (so authenticated callers get their proper rate limits).
++// When both keys and jwks are empty, all requests are allowed.
+ func authMiddleware(keys []string, jwks keyfunc.Keyfunc, next http.Handler) http.Handler {
+ 	keySet := make(map[string]bool)
+ 	for _, k := range keys {
+@@ -684,14 +694,15 @@ func authMiddleware(keys []string, jwks keyfunc.Keyfunc, next http.Handler) http
+ 	}
+ 	issuer := os.Getenv("CLERK_ISSUER")
+ 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+-		if isAuthExempt(keys, jwks, r) {
+-			next.ServeHTTP(w, r)
++		exempt := isAuthExempt(keys, jwks, r)
++		authed := checkCredentials(keySet, jwks, issuer, r)
++		if authed {
++			ctx := context.WithValue(r.Context(), ratelimit.ContextKeyAuthenticated, true)
++			next.ServeHTTP(w, r.WithContext(ctx))
+ 			return
+ 		}
+-		if checkCredentials(keySet, jwks, issuer, r) {
+-			ctx := r.Context()
+-			ctx = context.WithValue(ctx, ratelimit.ContextKeyAuthenticated, true)
+-			next.ServeHTTP(w, r.WithContext(ctx))
++		if exempt {
++			next.ServeHTTP(w, r)
+ 			return
+ 		}
+ 		writeUnauthorized(w)
+@@ -702,7 +713,10 @@ func isAuthExempt(keys []string, jwks keyfunc.Keyfunc, r *http.Request) bool {
+ 	if len(keys) == 0 && jwks == nil {
+ 		return true
+ 	}
+-	return r.URL.Path == "/health"
++	if r.Method == http.MethodGet && publicReadPaths[r.URL.Path] {
++		return true
++	}
++	return false
+ }
+ 
+ func extractToken(r *http.Request) string {
+@@ -715,7 +729,6 @@ func extractToken(r *http.Request) string {
+ func checkCredentials(keySet map[string]bool, jwks keyfunc.Keyfunc, issuer string, r *http.Request) bool {
+ 	supplied := extractToken(r)
+ 	if supplied == "" {
+-		log.Printf("[auth] no token for %s %s (Origin: %s)", r.Method, r.URL.Path, r.Header.Get("Origin"))
+ 		return false
+ 	}
+ 	if keySet[supplied] {
+@@ -738,30 +751,35 @@ func writeUnauthorized(w http.ResponseWriter) {
+ 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": "missing or invalid API key", "code": 401})
+ }
+ 
+-func corsMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
+-	allowAll := false
+-	originSet := make(map[string]bool)
++type corsConfig struct {
++	allowAll         bool
++	exactOrigins     map[string]bool
++	wildcardSuffixes []string
++}
++
++func parseCorsConfig(allowedOrigins []string) corsConfig {
++	cfg := corsConfig{exactOrigins: make(map[string]bool)}
+ 	for _, o := range allowedOrigins {
+ 		if o == "*" {
+-			allowAll = true
+-			break
++			cfg.allowAll = true
++			return cfg
+ 		}
+-		if o != "" {
+-			originSet[o] = true
++		if o == "" {
++			continue
+ 		}
+-	}
+-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+-		if allowAll {
+-			w.Header().Set("Access-Control-Allow-Origin", "*")
++		if idx := strings.Index(o, "://*."); idx > 0 {
++			cfg.wildcardSuffixes = append(cfg.wildcardSuffixes, o[idx+4:])
+ 		} else {
+-			origin := r.Header.Get("Origin")
+-			if origin != "" && originSet[origin] {
+-				w.Header().Set("Access-Control-Allow-Origin", origin)
+-			}
++			cfg.exactOrigins[o] = true
+ 		}
+-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
+-		w.Header().Set("Access-Control-Expose-Headers", "X-Hex-Count, Content-Length, Content-Encoding, X-Request-ID")
++	}
++	return cfg
++}
++
++func corsMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
++	cfg := parseCorsConfig(allowedOrigins)
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		setCORSHeaders(w, r, cfg)
+ 		if r.Method == "OPTIONS" {
+ 			w.WriteHeader(http.StatusNoContent)
+ 			return
+@@ -769,3 +787,35 @@ func corsMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
+ 		next.ServeHTTP(w, r)
+ 	})
+ }
++
++func setCORSHeaders(w http.ResponseWriter, r *http.Request, cfg corsConfig) {
++	if cfg.allowAll {
++		w.Header().Set("Access-Control-Allow-Origin", "*")
++	} else {
++		origin := r.Header.Get("Origin")
++		if origin != "" && isOriginAllowed(origin, cfg.exactOrigins, cfg.wildcardSuffixes) {
++			w.Header().Set("Access-Control-Allow-Origin", origin)
++			w.Header().Set("Vary", "Origin")
++		}
++	}
++	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
++	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
++	w.Header().Set("Access-Control-Expose-Headers", "X-Hex-Count, Content-Length, Content-Encoding, X-Request-ID")
++}
++
++func isOriginAllowed(origin string, exact map[string]bool, wildcardSuffixes []string) bool {
++	if exact[origin] {
++		return true
++	}
++	schemeEnd := strings.Index(origin, "://")
++	if schemeEnd < 0 {
++		return false
++	}
++	host := origin[schemeEnd+3:]
++	for _, suffix := range wildcardSuffixes {
++		if strings.HasSuffix(host, suffix) {
++			return true
++		}
++	}
++	return false
++}

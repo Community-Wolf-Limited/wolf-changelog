@@ -1,0 +1,4426 @@
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..127a67a
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,16 @@
++# Copy to .env and fill in values for local dev.
++
++# Wolf-server API.
++# Production: leave UNSET — uses /wolf-api Vercel rewrite (same-origin, no CORS).
++# Local dev with local wolf-server:
++# VITE_API_URL=http://localhost:4000/api
++# Local dev without wolf-server: leave unset — Vite proxy (/wolf-api → wolf-data-api.onrender.com)
++
++VITE_MAPBOX_TOKEN=
++
++# Go safety router (crime hex).
++# Production: leave UNSET — uses /pathfinder Vercel rewrite (same-origin, no CORS).
++# Local dev with local Go router:
++# VITE_SAFETY_ROUTER_URL=http://localhost:8090
++# VITE_SAFETY_ROUTER_API_KEY=test-key-local-dev
++# Local dev without Go router: leave unset — Vite proxy (/pathfinder → pathfinder.communitywolf.com)
+diff --git a/package.json b/package.json
+index a65fbe0..77d3876 100644
+--- a/package.json
++++ b/package.json
+@@ -58,6 +58,7 @@
+     "date-fns": "^3.6.0",
+     "dayjs": "^1.11.13",
+     "embla-carousel-react": "^8.5.2",
++    "h3-js": "^4.4.0",
+     "input-otp": "^1.2.4",
+     "jspdf": "^4.2.0",
+     "jspdf-autotable": "^5.0.2",
+diff --git a/src/components/ui/tooltip.tsx b/src/components/ui/tooltip.tsx
+index e121f0a..1707e81 100644
+--- a/src/components/ui/tooltip.tsx
++++ b/src/components/ui/tooltip.tsx
+@@ -12,16 +12,20 @@ const TooltipTrigger = TooltipPrimitive.Trigger
+ const TooltipContent = React.forwardRef<
+   React.ElementRef<typeof TooltipPrimitive.Content>,
+   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+->(({ className, sideOffset = 4, ...props }, ref) => (
+-  <TooltipPrimitive.Content
+-    ref={ref}
+-    sideOffset={sideOffset}
+-    className={cn(
+-      "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+-      className
+-    )}
+-    {...props}
+-  />
++>(({ className, sideOffset = 4, collisionPadding = 12, ...props }, ref) => (
++  <TooltipPrimitive.Portal>
++    <TooltipPrimitive.Content
++      ref={ref}
++      sideOffset={sideOffset}
++      collisionPadding={collisionPadding}
++      className={cn(
++        /** z above map overlays (FAB ~30, loading island ~2000), portaled to body so parents’ overflow cannot clip */
++        "z-[10000] max-w-[min(20rem,calc(100vw-1.5rem))] rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
++        className
++      )}
++      {...props}
++    />
++  </TooltipPrimitive.Portal>
+ ))
+ TooltipContent.displayName = TooltipPrimitive.Content.displayName
+ 
+diff --git a/src/hooks/use-areas.tsx b/src/hooks/use-areas.tsx
+deleted file mode 100644
+index edcbcef..0000000
+--- a/src/hooks/use-areas.tsx
++++ /dev/null
+@@ -1,24 +0,0 @@
+-import { AreaType } from "@/types/area.type";
+-import { useOrganisation } from "@/contexts/OrganisationContext";
+-import { useAuth } from "@clerk/clerk-react";
+-import { api } from "@/utils/api";
+-
+-export const useAreas = () => {
+-  const { currentOrganisation } = useOrganisation();
+-  const { getToken } = useAuth();
+-
+-  const fetchAreas = async () => {
+-    const areas = await api.get<AreaType[]>(
+-      `/${currentOrganisation?._id}/area`,
+-      {
+-        token: await getToken(),
+-      }
+-    );
+-
+-    return areas;
+-  };
+-
+-  return { fetchAreas };
+-};
+-
+-export default useAreas;
+diff --git a/src/pages/live-map/CrimeHexDrawer.tsx b/src/pages/live-map/CrimeHexDrawer.tsx
+new file mode 100644
+index 0000000..53d8cb7
+--- /dev/null
++++ b/src/pages/live-map/CrimeHexDrawer.tsx
+@@ -0,0 +1,769 @@
++import { useState, useEffect, useMemo, useRef } from "react";
++import { gridDisk, cellToLatLng, cellToBoundary } from "h3-js";
++import { Button } from "@/components/ui/button";
++import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
++import { Card, CardContent } from "@/components/ui/card";
++import { Badge } from "@/components/ui/badge";
++import { Separator } from "@/components/ui/separator";
++import { ScrollArea } from "@/components/ui/scroll-area";
++import {
++  Zap, Home, Pill, AlertTriangle, TrendingUp, Clock, X,
++  Hexagon, ChevronDown, LayoutList,
++} from "lucide-react";
++import { cn } from "@/lib/utils";
++import type { CwUnifiedCrimeHexItem } from "@/utils/cw-unified-crime-hex-api";
++
++// ─── types ────────────────────────────────────────────────────
++interface CrimeHexDrawerProps {
++  readonly h3Index: string | null;
++  readonly hexData: CwUnifiedCrimeHexItem[];
++  readonly open: boolean;
++  readonly onOpenChange: (open: boolean) => void;
++}
++
++// ─── constants & utils ────────────────────────────────────────
++const ANNUALISE = 4;
++
++const CAT = {
++  violent:  { label: "Violent",  color: "#dc2626", Icon: Zap,  description: "Assault, robbery, murder, sexual offences" },
++  property: { label: "Property", color: "#1a4f38", Icon: Home, description: "Burglary, break-ins, theft" },
++  drug:     { label: "Drug",     color: "#6b7280", Icon: Pill, description: "Drug-related offences" },
++} as const;
++
++type CatKey = keyof typeof CAT;
++const CAT_KEYS: readonly CatKey[] = ["violent", "property", "drug"];
++
++function getNeighborIndices(centerH3: string): string[] {
++  try { return gridDisk(centerH3, 1).filter(h => h !== centerH3); }
++  catch { return []; }
++}
++
++function threatScore(item: CwUnifiedCrimeHexItem | null): number {
++  if (!item) return 0;
++  return Math.min(100, item.violentCount * 14 + item.propertyCount * 7 + item.drugCount * 6);
++}
++
++function getThreat(score: number) {
++  if (score >= 70) return { label: "Critical",  color: "#dc2626", dim: "rgba(220,38,38,0.12)",  variant: "destructive" as const, text: "Extreme danger zone. Avoid if possible." };
++  if (score >= 45) return { label: "High",      color: "#d97706", dim: "rgba(217,119,6,0.12)",  variant: "default" as const,     text: "Significantly elevated crime activity." };
++  if (score >= 20) return { label: "Moderate",   color: "#1a4f38", dim: "rgba(26,79,56,0.12)",   variant: "secondary" as const,   text: "Noticeable crime presence. Stay alert." };
++  if (score > 0)   return { label: "Low",        color: "#2d7a5a", dim: "rgba(45,122,90,0.10)",  variant: "outline" as const,     text: "Minor activity recorded." };
++  return             { label: "Clear",      color: "#6b7280", dim: "rgba(107,114,128,0.06)", variant: "outline" as const,     text: "No incidents recorded in this cell." };
++}
++
++function getCatCount(item: CwUnifiedCrimeHexItem, key: CatKey): number {
++  if (key === "violent") return item.violentCount;
++  if (key === "property") return item.propertyCount;
++  return item.drugCount;
++}
++
++function getH3DisplayText(c: CwUnifiedCrimeHexItem | null, h3Index: string | null): string {
++  if (c) return `…${c.h3Index.slice(-10)}`;
++  if (h3Index) return "No data";
++  return "No hex selected";
++}
++
++// ─── hex style helpers (theme-aware via currentColor) ─────────
++function hexFillAttrs(selected: boolean, hovered: boolean, hasCrime: boolean, dim: string, color: string) {
++  if (selected) return { fill: dim, fillOpacity: 1 };
++  if (hovered) return { fill: `${color}20`, fillOpacity: 1 };
++  if (hasCrime) return { fill: "currentColor", fillOpacity: 0.04 };
++  return { fill: "currentColor", fillOpacity: 0.012 };
++}
++
++function hexStrokeAttrs(hasCrime: boolean, highlighted: boolean, color: string) {
++  if (!hasCrime) return { stroke: "currentColor", strokeOpacity: 0.08 };
++  if (highlighted) return { stroke: color, strokeOpacity: 1 };
++  return { stroke: color, strokeOpacity: 0.33 };
++}
++
++function hexStrokeWidth(selected: boolean, hovered: boolean): number {
++  if (selected) return 0.08;
++  if (hovered) return 0.06;
++  return 0.03;
++}
++
++// ─── H3 layout: compute positions from actual coordinates ─────
++interface HexPosition { x: number; y: number; angle: number }
++
++function computeH3Layout(
++  centerH3: string,
++  neighborH3s: string[],
++): { positions: HexPosition[]; vertexRotation: number } {
++  const R = 1;
++  const D = R * Math.sqrt(3);
++  const fallbackRotation = -Math.PI / 6;
++
++  if (neighborH3s.length === 0) {
++    return { positions: [], vertexRotation: fallbackRotation };
++  }
++
++  try {
++    const [cLat, cLng] = cellToLatLng(centerH3);
++    const cosLat = Math.cos(cLat * Math.PI / 180);
++
++    const boundary = cellToBoundary(centerH3);
++    const [v0Lat, v0Lng] = boundary[0];
++    const vDx = (v0Lng - cLng) * cosLat;
++    const vDy = -(v0Lat - cLat);
++    const vertexRotation = Math.atan2(vDy, vDx);
++
++    // 6 canonical slot angles — each neighbor faces an edge midpoint,
++    // exactly 30° offset from vertex 0, then every 60° after that.
++    const slots = Array.from({ length: 6 }, (_, k) =>
++      vertexRotation + Math.PI / 6 + k * Math.PI / 3,
++    );
++
++    // Compute raw angles from H3 coordinates
++    const rawAngles = neighborH3s.map(n => {
++      const [nLat, nLng] = cellToLatLng(n);
++      const dx = (nLng - cLng) * cosLat;
++      const dy = -(nLat - cLat);
++      return Math.atan2(dy, dx);
++    });
++
++    // Build every (neighbor, slot) pair scored by angular distance
++    const pairs: { ni: number; si: number; diff: number }[] = [];
++    for (let ni = 0; ni < rawAngles.length; ni++) {
++      for (let si = 0; si < 6; si++) {
++        let diff = Math.abs(rawAngles[ni] - slots[si]);
++        if (diff > Math.PI) diff = 2 * Math.PI - diff;
++        pairs.push({ ni, si, diff });
++      }
++    }
++    pairs.sort((a, b) => a.diff - b.diff);
++
++    // Greedy unique assignment — closest pairs first, no double-booking
++    const assigned = new Array<number>(rawAngles.length).fill(-1);
++    const taken = new Set<number>();
++    for (const { ni, si } of pairs) {
++      if (assigned[ni] !== -1 || taken.has(si)) continue;
++      assigned[ni] = si;
++      taken.add(si);
++    }
++
++    const positions = neighborH3s.map((_, i) => {
++      const angle = slots[assigned[i]];
++      return { x: D * Math.cos(angle), y: D * Math.sin(angle), angle };
++    });
++
++    return { positions, vertexRotation };
++  } catch {
++    const positions = neighborH3s.map((_, i) => {
++      const angle = fallbackRotation + Math.PI / 6 + i * Math.PI / 3;
++      return { x: D * Math.cos(angle), y: D * Math.sin(angle), angle };
++    });
++    return { positions, vertexRotation: fallbackRotation };
++  }
++}
++
++function makeHexPoints(vertexRotation: number): (cx: number, cy: number, r: number) => string {
++  return (cx, cy, r) =>
++    Array.from({ length: 6 }, (_, i) => {
++      const a = (Math.PI / 3) * i + vertexRotation;
++      return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
++    }).join(" ");
++}
++
++// ─── HexCell style computation (extracted for complexity) ─────
++function computeHexCellStyles(
++  hovered: boolean, selected: boolean, hasCrime: boolean,
++  hexR: number, color: string, dim: string,
++) {
++  const highlighted = selected || hovered;
++  const fa = hexFillAttrs(selected, hovered, hasCrime, dim, color);
++  const sa = hexStrokeAttrs(hasCrime, highlighted, color);
++  return {
++    highlighted,
++    fill: fa.fill,
++    fillOpacity: fa.fillOpacity,
++    stroke: sa.stroke,
++    strokeOpacity: sa.strokeOpacity,
++    strokeW: hexStrokeWidth(selected, hovered),
++    dotR: hexR * (hovered ? 0.14 : 0.11),
++    dotOpacity: hasCrime ? 1 : 0.25,
++    dotFilter: hasCrime ? `drop-shadow(0 0 0.12px ${color})` : undefined,
++    countFill: "currentColor" as const,
++    countOpacity: hasCrime ? 1 : 0.2,
++    countSize: hovered ? hexR * 0.52 : hexR * 0.44,
++    connStroke: hasCrime ? color : "currentColor",
++    connStrokeOpacity: hasCrime ? 0.19 : 0.04,
++    connWidth: hovered ? 0.04 : 0.02,
++    connDash: hovered ? undefined as string | undefined : "0.06 0.06",
++    glowStrokeW: hovered ? 0.12 : 0.08,
++    glowOpacity: hovered ? 0.45 : 0.3,
++  };
++}
++
++// ─── ThreatArc (SVG gauge — keeps inline styles) ──────────────
++function ThreatArc({ score, color }: Readonly<{ score: number; color: string }>) {
++  const r = 46, cx = 60, cy = 60, start = -210, span = 240;
++  const rad = (a: number) => a * Math.PI / 180;
++  const pt  = (a: number) => ({ x: cx + r * Math.cos(rad(a)), y: cy + r * Math.sin(rad(a)) });
++  const arc = (s: number, e: number) => {
++    const sp = pt(s), ep = pt(e); return `M${sp.x} ${sp.y}A${r} ${r} 0 ${e - s > 180 ? 1 : 0} 1 ${ep.x} ${ep.y}`;
++  };
++  const filled = start + span * (score / 100);
++  const ticks = Array.from({ length: 11 }, (_, i) => {
++    const a = start + (span * i) / 10;
++    const ip = pt(a);
++    const tickOuter = r + (i % 5 === 0 ? 7 : 4);
++    return { a, ip, op: { x: cx + tickOuter * Math.cos(rad(a)), y: cy + tickOuter * Math.sin(rad(a)) }, major: i % 5 === 0 };
++  });
++  return (
++    <svg viewBox="0 0 120 86" className="overflow-visible w-full h-auto max-h-[140px]" preserveAspectRatio="xMidYMid meet">
++      <defs>
++        <filter id="chd-gf"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
++        <linearGradient id="chd-ag" gradientUnits="userSpaceOnUse" x1="14" y1="60" x2="106" y2="60">
++          <stop offset="0%" stopColor="#1a4f38"/><stop offset="50%" stopColor="#d97706"/><stop offset="100%" stopColor="#dc2626"/>
++        </linearGradient>
++      </defs>
++      <path d={arc(start, start + span)} fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" opacity={0.08}/>
++      {score > 0 && <path d={arc(start, filled)} fill="none" stroke="url(#chd-ag)" strokeWidth="4.5" strokeLinecap="round" filter="url(#chd-gf)"/>}
++      {ticks.map(t => (
++        <line key={t.a} x1={t.ip.x} y1={t.ip.y} x2={t.op.x} y2={t.op.y}
++          stroke="currentColor" opacity={t.major ? 0.22 : 0.07} strokeWidth={t.major ? 1.5 : 1}/>
++      ))}
++      {score > 0 && <circle cx={pt(filled).x} cy={pt(filled).y} r="4" fill={color} style={{ filter: `drop-shadow(0 0 5px ${color})` }}/>}
++      <text x={cx} y={56} textAnchor="middle" fill="currentColor" fontSize="20" fontWeight="700">{score}</text>
++      <text x={cx} y={70} textAnchor="middle" fill="currentColor" fontSize="7" opacity={0.35}
++        style={{ letterSpacing: "2px" }}>THREAT</text>
++    </svg>
++  );
++}
++
++// ─── CatBar (custom visualization — keeps inline for SVG-like rendering) ──
++function CatBar({ catKey, value, max }: Readonly<{ catKey: CatKey; value: number; max: number }>) {
++  const cfg = CAT[catKey];
++  const hasValue = value > 0;
++  const pct = hasValue ? Math.max(12, (value / max) * 100) : 0;
++  return (
++    <div className="flex-1 flex flex-col items-center text-center gap-1 py-2 px-1">
++      <cfg.Icon size={18} className={cn("mb-1", hasValue ? "" : "opacity-25")} style={{ color: hasValue ? cfg.color : undefined }}/>
++      <div className="h-12 w-6 rounded bg-muted/50 relative overflow-hidden border border-border/30">
++        <div
++          className="absolute bottom-0 left-0 right-0 rounded transition-all duration-700"
++          style={{ height: `${pct}%`, background: hasValue ? cfg.color : "transparent", boxShadow: hasValue ? `0 0 8px ${cfg.color}60` : "none" }}
++        />
++      </div>
++      <span className={cn("text-sm font-bold font-mono", !hasValue && "text-muted-foreground/30")} style={{ color: hasValue ? cfg.color : undefined }}>
++        {hasValue ? value : "—"}
++      </span>
++      {hasValue && (
++        <span className="text-[10px] text-muted-foreground font-mono">~{value * ANNUALISE}/yr</span>
++      )}
++      <span className="text-[10px] text-muted-foreground tracking-wider">{cfg.label}</span>
++    </div>
++  );
++}
++
++// ─── Chips (incident type badges) ─────────────────────────────
++function Chips({ counts, limit = 2 }: Readonly<{ counts: Record<string, number>; limit?: number }>) {
++  const [exp, setExp] = useState(false);
++  const entries = Object.entries(counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
++  if (!entries.length) return <span className="text-xs text-muted-foreground">No incidents</span>;
++  const shown = exp ? entries : entries.slice(0, limit);
++  return (
++    <div className="space-y-1.5">
++      <div className="text-[10px] text-muted-foreground tracking-widest font-medium">INCIDENT TYPES</div>
++      <div className="flex flex-wrap gap-1.5">
++        {shown.map(([t, n]) => (
++          <Badge key={t} variant="outline" className="font-normal text-xs gap-1.5 py-0.5">
++            {t}
++            <span className="bg-muted rounded-full px-1.5 text-[10px] font-mono font-semibold">×{n}</span>
++          </Badge>
++        ))}
++        {entries.length > limit && (
++          <button type="button" onClick={() => setExp(e => !e)}
++            className="text-xs text-muted-foreground border border-border rounded-full px-2.5 py-0.5 hover:bg-accent transition-colors">
++            {exp ? "less" : `+${entries.length - limit}`}
++          </button>
++        )}
++      </div>
++    </div>
++  );
++}
++
++// ─── Quarterly context banner ─────────────────────────────────
++function QuarterlyBanner({ totalCount }: Readonly<{ totalCount: number }>) {
++  const projected = totalCount * ANNUALISE;
++  return (
++    <div className="flex items-start gap-2 bg-wolf-green/5 border border-wolf-green/20 rounded-lg p-2.5 mt-3">
++      <Clock size={12} className="text-wolf-green shrink-0 mt-0.5"/>
++      <div>
++        <div className="text-[10px] text-wolf-green font-medium tracking-wide mb-0.5">QUARTERLY SNAPSHOT</div>
++        <p className="text-xs text-muted-foreground leading-relaxed">
++          Data covers ~1 quarter. Projected annual total:{" "}
++          <span className="text-wolf-green font-semibold">~{projected} incidents</span>.
++          {projected >= 20 && " This area has elevated year-round risk."}
++        </p>
++      </div>
++    </div>
++  );
++}
++
++// ─── CategoryDots (SVG sub-component) ─────────────────────────
++function CategoryDots({ x, y, r, hovered, item }: Readonly<{
++  x: number; y: number; r: number; hovered: boolean; item: CwUnifiedCrimeHexItem;
++}>) {
++  const cy = y + r * (hovered ? 0.66 : 0.58);
++  const dotR = r * (hovered ? 0.1 : 0.09);
++  return (
++    <g>
++      {item.violentCount  > 0 && <circle cx={x - r * 0.22} cy={cy} r={dotR} fill={CAT.violent.color}  style={{ transition: "all 0.15s" }}/>}
++      {item.propertyCount > 0 && <circle cx={x}             cy={cy} r={dotR} fill={CAT.property.color} style={{ transition: "all 0.15s" }}/>}
++      {item.drugCount     > 0 && <circle cx={x + r * 0.22} cy={cy} r={dotR} fill={CAT.drug.color}     style={{ transition: "all 0.15s" }}/>}
++    </g>
++  );
++}
++
++// ─── HexCell (SVG — keeps inline styles) ──────────────────────
++function HexCell({ item, pos, selected, hovered, hexR, hexPts, onSelect, onHover }: Readonly<{
++  item: CwUnifiedCrimeHexItem;
++  pos: HexPosition;
++  selected: boolean;
++  hovered: boolean;
++  hexR: number;
++  hexPts: (cx: number, cy: number, r: number) => string;
++  onSelect: () => void;
++  onHover: (h: boolean) => void;
++}>) {
++  const score = threatScore(item);
++  const { color } = getThreat(score);
++  const hasCrime = item.totalCount > 0;
++  const ri = hexR - 0.08;
++  const s = computeHexCellStyles(hovered, selected, hasCrime, hexR, color, getThreat(score).dim);
++
++  return (
++    <g onClick={onSelect} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)}
++      style={{ cursor: "pointer" }}>
++      {s.highlighted && (
++        <polygon points={hexPts(pos.x, pos.y, ri + 0.18)}
++          fill="none" stroke={color} strokeWidth={s.glowStrokeW} opacity={s.glowOpacity}
++          filter="url(#chd-hglow2)"/>
++      )}
++      {selected && (
++        <polygon points={hexPts(pos.x, pos.y, ri + 0.08)}
++          fill="none" stroke={color} strokeWidth="0.07" opacity="0.6"
++          filter="url(#chd-hglow)"/>
++      )}
++      <polygon points={hexPts(pos.x, pos.y, ri)}
++        fill={s.fill} fillOpacity={s.fillOpacity} stroke={s.stroke} strokeOpacity={s.strokeOpacity} strokeWidth={s.strokeW}/>
++      <circle cx={pos.x} cy={pos.y - hexR * 0.42} r={s.dotR}
++        fill={color} opacity={s.dotOpacity}
++        style={{ transition: "r 0.15s", filter: s.dotFilter }}/>
++      <text x={pos.x} y={pos.y + hexR * 0.14} textAnchor="middle"
++        fill={s.countFill} opacity={s.countOpacity} fontSize={s.countSize} fontWeight="700"
++        style={{ transition: "font-size 0.15s" }}>
++        {item.totalCount}
++      </text>
++      {hovered && hasCrime && (
++        <text x={pos.x} y={pos.y + hexR * 0.42} textAnchor="middle"
++          fill="currentColor" opacity={0.5} fontSize={hexR * 0.2}
++          style={{ fontFamily: "monospace" }}>
++          ~{item.totalCount * ANNUALISE}/yr
++        </text>
++      )}
++      <CategoryDots x={pos.x} y={pos.y} r={hexR} hovered={hovered} item={item}/>
++      {hovered ? (
++        <text x={pos.x} y={pos.y + hexR * 0.88} textAnchor="middle"
++          fill={color} fontSize={hexR * 0.19} fontWeight="600"
++          style={{ fontFamily: "monospace", letterSpacing: "0.05em", filter: `drop-shadow(0 0 0.08px ${color})` }}>
++          {getThreat(score).label}
++        </text>
++      ) : (
++        <text x={pos.x} y={pos.y + hexR * 0.88} textAnchor="middle"
++          fill="currentColor" opacity={0.15} fontSize={hexR * 0.17}
++          style={{ fontFamily: "monospace" }}>
++          …{item.h3Index.slice(-5)}
++        </text>
++      )}
++      <line x1={0} y1={0} x2={pos.x * 0.78} y2={pos.y * 0.78}
++        stroke={s.connStroke} strokeOpacity={s.connStrokeOpacity} strokeWidth={s.connWidth}
++        strokeDasharray={s.connDash}
++        style={{ transition: "all 0.15s" }}/>
++    </g>
++  );
++}
++
++// ─── HoneycombTooltip ─────────────────────────────────────────
++function HoneycombTooltip({ item, isRightSide, pos }: Readonly<{
++  item: CwUnifiedCrimeHexItem;
++  isRightSide: boolean;
++  pos: { x: number; y: number };
++}>) {
++  const score = threatScore(item);
++  const { label: tLabel, color: tColor, text: tText } = getThreat(score);
++  const incidents = Object.entries(item.incidentTypeCounts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
++
++  return (
++    <div
++      className="absolute w-44 bg-card border rounded-lg p-3 shadow-xl z-30 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-none"
++      style={{
++        top: pos.y,
++        left: pos.x,
++        transform: isRightSide ? "translate(1rem, -50%)" : "translate(calc(-100% - 1rem), -50%)",
++        borderColor: `${tColor}40`,
++      }}
++    >
++      <div className="flex items-center gap-2 mb-2">
++        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: tColor, boxShadow: `0 0 5px ${tColor}` }}/>
++        <span className="text-[10px] tracking-widest font-mono font-medium" style={{ color: tColor }}>{tLabel}</span>
++      </div>
++
++      <div className="flex justify-between gap-2 mb-2">
++        {CAT_KEYS.map(k => {
++          const cfg = CAT[k];
++          const val = getCatCount(item, k);
++          return (
++            <div key={k} className="text-center flex-1">
++              <cfg.Icon size={10} style={{ color: val > 0 ? cfg.color : undefined }} className={cn("mx-auto mb-0.5", !val && "opacity-20")}/>
++              <div className="text-xs font-bold font-mono" style={{ color: val > 0 ? cfg.color : undefined }}>
++                {val > 0 ? val : "—"}
++              </div>
++              <div className="text-[8px] text-muted-foreground tracking-wide">{cfg.label}</div>
++            </div>
++          );
++        })}
++      </div>
++
++      {item.totalCount > 0 && (
++        <div className="flex items-center gap-1.5 bg-wolf-green/10 rounded px-2 py-1 mb-2">
++          <TrendingUp size={9} className="text-wolf-green shrink-0"/>
++          <span className="text-[10px] font-mono text-wolf-green/80">~{item.totalCount * ANNUALISE} projected/yr</span>
++        </div>
++      )}
++
++      {incidents.length > 0 && (
++        <div>
++          <div className="text-[9px] text-muted-foreground tracking-widest mb-1">TOP INCIDENTS</div>
++          {incidents.slice(0, 3).map(([t, v]) => (
++            <div key={t} className="flex justify-between items-center text-[10px] mb-0.5">
++              <span className="text-muted-foreground truncate max-w-[100px] font-mono">{t}</span>
++              <span className="font-bold font-mono shrink-0 ml-1">×{v}</span>
++            </div>
++          ))}
++        </div>
++      )}
++
++      {!item.totalCount && (
++        <p className="text-[10px] text-muted-foreground leading-relaxed">{tText}</p>
++      )}
++    </div>
++  );
++}
++
++// ─── Honeycomb Map (H3-aware SVG layout) ──────────────────────
++function HoneycombMap({ centerH3, neighbors, onSelect, selectedIndex }: Readonly<{
++  centerH3: string;
++  neighbors: CwUnifiedCrimeHexItem[];
++  onSelect: (i: number) => void;
++  selectedIndex: number | null;
++}>) {
++  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
++  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
++  const svgRef = useRef<SVGSVGElement>(null);
++  const containerRef = useRef<HTMLDivElement>(null);
++
++  const R = 1;
++  const { positions: nCentres, vertexRotation } = useMemo(
++    () => computeH3Layout(centerH3, neighbors.map(n => n.h3Index)),
++    [centerH3, neighbors],
++  );
++  const hexPts = useMemo(() => makeHexPoints(vertexRotation), [vertexRotation]);
++
++  const D = R * Math.sqrt(3);
++  const pad = R + 0.25;
++  const vSize = (D + pad) * 2;
++  const vMin = -(D + pad);
++
++  return (
++    <div ref={containerRef} className="relative w-full flex-1 min-h-0 bg-muted/30 rounded-lg border border-border/30">
++      <svg
++        ref={svgRef}
++        viewBox={`${vMin} ${vMin} ${vSize} ${vSize}`}
++        className="w-full block overflow-visible"
++        style={{ maxHeight: "calc(85vh - 12rem)" }}
++        preserveAspectRatio="xMidYMid meet"
++      >
++        <defs>
++          <filter id="chd-hglow" x="-80%" y="-80%" width="260%" height="260%">
++            <feGaussianBlur stdDeviation="0.12" result="b"/>
++            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
++          </filter>
++          <filter id="chd-hglow2" x="-80%" y="-80%" width="260%" height="260%">
++            <feGaussianBlur stdDeviation="0.22" result="b"/>
++            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
++          </filter>
++        </defs>
++
++        <polygon points={hexPts(0, 0, R - 0.05)}
++          fill="currentColor" fillOpacity={0.04} stroke="currentColor" strokeOpacity={0.18}
++          strokeWidth="0.05" strokeDasharray="0.15 0.12"/>
++        <text x="0" y="0.08" textAnchor="middle" fill="currentColor" opacity={0.3} fontSize="0.25"
++          style={{ fontFamily: "monospace", letterSpacing: "0.02em" }}>YOU</text>
++
++        {nCentres.map((pos, i) => {
++          const n = neighbors[i];
++          if (!n) return null;
++          return (
++            <HexCell
++              key={n.h3Index}
++              item={n}
++              pos={pos}
++              selected={selectedIndex === i}
++              hovered={hoveredIndex === i}
++              hexR={R}
++              hexPts={hexPts}
++              onSelect={() => onSelect(i)}
++              onHover={h => {
++                setHoveredIndex(h ? i : null);
++                if (h && svgRef.current && containerRef.current) {
++                  const ctm = svgRef.current.getScreenCTM();
++                  if (ctm) {
++                    const sp = new DOMPoint(pos.x, pos.y).matrixTransform(ctm);
++                    const cr = containerRef.current.getBoundingClientRect();
++                    setTooltipPos({ x: sp.x - cr.left, y: sp.y - cr.top });
++                  }
++                } else {
++                  setTooltipPos(null);
++                }
++              }}
++            />
++          );
++        })}
++      </svg>
++
++      {hoveredIndex !== null && neighbors[hoveredIndex] && tooltipPos && (
++        <HoneycombTooltip
++          item={neighbors[hoveredIndex]}
++          isRightSide={nCentres[hoveredIndex]?.x > 0}
++          pos={tooltipPos}
++        />
++      )}
++    </div>
++  );
++}
++
++// ─── NeighborDetail slide-up panel ───────────────────────────
++function NeighborDetail({ item, onClose }: Readonly<{ item: CwUnifiedCrimeHexItem; onClose: () => void }>) {
++  const score = threatScore(item);
++  const { label, color } = getThreat(score);
++  const maxCat = Math.max(item.violentCount, item.propertyCount, item.drugCount, 1);
++  return (
++    <Card className="absolute bottom-0 left-0 right-0 z-20 rounded-b-none animate-in slide-in-from-bottom duration-200"
++      style={{ borderTopColor: `${color}40` }}>
++      <CardContent className="p-4">
++        <div className="flex items-center justify-between mb-3">
++          <div className="flex items-center gap-2">
++            <div className="w-1.5 h-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }}/>
++            <span className="text-[10px] tracking-widest text-muted-foreground font-medium">NEIGHBOR</span>
++            <code className="text-[10px] text-muted-foreground/50">…{item.h3Index.slice(-8)}</code>
++          </div>
++          <div className="flex items-center gap-2">
++            <Badge variant="outline" className="text-[10px] py-0" style={{ color, borderColor: `${color}50` }}>{label}</Badge>
++            <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors p-0.5">
++              <X size={14}/>
++            </button>
++          </div>
++        </div>
++        {item.totalCount > 0 ? (
++          <div className="flex gap-4 items-start">
++            <div className="flex items-end gap-1">
++              <CatBar catKey="violent"  value={item.violentCount}  max={maxCat}/>
++              <CatBar catKey="property" value={item.propertyCount} max={maxCat}/>
++              <CatBar catKey="drug"     value={item.drugCount}     max={maxCat}/>
++            </div>
++            <div className="flex-1 pt-1"><Chips counts={item.incidentTypeCounts} limit={4}/></div>
++          </div>
++        ) : (
++          <p className="text-xs text-muted-foreground">
++            {item.hasCrimeNeighbor ? "No incidents — adjacent to active area." : "No incidents recorded."}
++          </p>
++        )}
++      </CardContent>
++    </Card>
++  );
++}
++
++// ─── Neighbor list row ────────────────────────────────────────
++function NeighborListRow({ item }: Readonly<{ item: CwUnifiedCrimeHexItem }>) {
++  const [open, setOpen] = useState(false);
++  const score = threatScore(item);
++  const { label, color } = getThreat(score);
++  const hasCrime = item.totalCount > 0;
++  const maxCat = Math.max(item.violentCount, item.propertyCount, item.drugCount, 1);
++  return (
++    <div className={cn("rounded-lg border overflow-hidden transition-colors", hasCrime ? "border-border bg-card" : "border-border/30")}>
++      <button type="button" onClick={() => hasCrime && setOpen(o => !o)}
++        className={cn("w-full bg-transparent border-none p-2.5 flex items-center gap-2.5 text-left", hasCrime ? "cursor-pointer hover:bg-accent/50" : "cursor-default")}>
++        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color, boxShadow: hasCrime ? `0 0 5px ${color}` : "none" }}/>
++        <code className="text-[10px] text-muted-foreground shrink-0">…{item.h3Index.slice(-8)}</code>
++        <div className="flex gap-2 flex-1 justify-end items-center">
++          {item.violentCount  > 0 && <span className="text-xs font-mono flex items-center gap-0.5" style={{ color: CAT.violent.color }}><Zap size={10}/>{item.violentCount}</span>}
++          {item.propertyCount > 0 && <span className="text-xs font-mono flex items-center gap-0.5" style={{ color: CAT.property.color }}><Home size={10}/>{item.propertyCount}</span>}
++          {item.drugCount     > 0 && <span className="text-xs font-mono flex items-center gap-0.5" style={{ color: CAT.drug.color }}><Pill size={10}/>{item.drugCount}</span>}
++          {!hasCrime && <span className="text-xs text-muted-foreground">{item.hasCrimeNeighbor ? "adjacent" : "clear"}</span>}
++        </div>
++        <Badge variant="outline" className="text-[10px] py-0 shrink-0" style={{ color, borderColor: `${color}40` }}>{label}</Badge>
++        {hasCrime && <ChevronDown size={12} className={cn("text-muted-foreground transition-transform shrink-0", open && "rotate-180")}/>}
++      </button>
++      {hasCrime && open && (
++        <div className="px-3 pb-3 border-t border-border/50">
++          <div className="pt-2 flex gap-4 items-start">
++            <div className="flex items-end gap-1">
++              <CatBar catKey="violent"  value={item.violentCount}  max={maxCat}/>
++              <CatBar catKey="property" value={item.propertyCount} max={maxCat}/>
++              <CatBar catKey="drug"     value={item.drugCount}     max={maxCat}/>
++            </div>
++            <div className="flex-1"><Chips counts={item.incidentTypeCounts} limit={4}/></div>
++          </div>
++          <div className="flex items-center gap-1.5 bg-wolf-green/5 border border-wolf-green/15 rounded-md px-2 py-1.5 mt-3">
++            <TrendingUp size={10} className="text-wolf-green shrink-0"/>
++            <span className="text-[10px] font-mono text-wolf-green/80">~{item.totalCount * ANNUALISE} incidents projected annually</span>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
++
++// ─── Main export ──────────────────────────────────────────────
++export default function CrimeHexDrawer({ h3Index, hexData, open, onOpenChange }: Readonly<CrimeHexDrawerProps>) {
++  const [selectedNeighborIdx, setSelectedNeighborIdx] = useState<number | null>(null);
++  const [tab, setTab] = useState<string>("list");
++
++  useEffect(() => { setSelectedNeighborIdx(null); }, [h3Index]);
++
++  const { center, neighbors } = useMemo(() => {
++    if (!h3Index) return { center: null, neighbors: [] as CwUnifiedCrimeHexItem[] };
++    const map = new Map<string, CwUnifiedCrimeHexItem>();
++    for (const item of hexData) map.set(item.h3Index, item);
++    const c = map.get(h3Index) ?? null;
++    const ns = getNeighborIndices(h3Index).map(h => map.get(h)).filter((x): x is CwUnifiedCrimeHexItem => x != null);
++    return { center: c, neighbors: ns };
++  }, [h3Index, hexData]);
++
++  const c = center;
++  const score = threatScore(c);
++  const { label, color } = getThreat(score);
++  const maxCat = c ? Math.max(c.violentCount, c.propertyCount, c.drugCount, 1) : 1;
++  const activeNeighbors = neighbors.filter(n => n.totalCount > 0).length;
++  const selectedNeighbor = selectedNeighborIdx === null ? null : neighbors[selectedNeighborIdx];
++
++  if (!open) return null;
++
++  return (
++    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 pb-5">
++      <div className="bg-background rounded-lg w-full max-w-[75vw] max-h-[85vh] overflow-hidden">
++        <div className="p-4 border-b flex items-center justify-between">
++          <div className="flex items-center gap-3">
++            <h2 className="flex items-center gap-2 text-base font-semibold">
++              <Hexagon size={16} className="text-muted-foreground"/>
++              Crime Hex Analysis
++            </h2>
++            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
++              <AlertTriangle size={12}/>
++              <span>
++                <span className="font-semibold" style={{ color: activeNeighbors > 0 ? color : "#1a4f38" }}>{activeNeighbors}</span>
++                {" / "}{neighbors.length} active
++              </span>
++            </div>
++            {c && (
++              <Badge variant="outline" className="text-xs py-0.5" style={{ color, borderColor: `${color}40` }}>{label}</Badge>
++            )}
++          </div>
++          <Button variant="outline" onClick={() => onOpenChange(false)}>
++            Close
++          </Button>
++        </div>
++
++        <div className="h-[calc(85vh-80px)] overflow-hidden flex flex-col px-6 py-4">
++          <Separator className="mb-2"/>
++          <Tabs value={tab} onValueChange={v => { setTab(v); setSelectedNeighborIdx(null); }} className="flex-1 min-h-0 flex flex-col">
++            <TabsList className="grid w-full grid-cols-2 shrink-0">
++              <TabsTrigger value="list" className="flex items-center gap-2 text-xs">
++                <LayoutList size={14}/>
++                Details + List
++              </TabsTrigger>
++              <TabsTrigger value="map" className="flex items-center gap-2 text-xs">
++                <Hexagon size={14}/>
++                Map View
++              </TabsTrigger>
++            </TabsList>
++
++            <TabsContent value="list" className="flex-1 min-h-0 mt-3">
++              <ScrollArea className="h-[calc(85vh-180px)]">
++                <div className="space-y-4 pb-6">
++                  {/* Selected hex detail card */}
++                  <Card>
++                    <CardContent className="p-4">
++                      <div className="flex items-center justify-between mb-3">
++                        <Badge variant="outline" className="text-xs" style={{ color, borderColor: `${color}40` }}>{label}</Badge>
++                        <code className="text-[10px] text-muted-foreground">{getH3DisplayText(c, h3Index)}</code>
++                      </div>
++                      {c ? (
++                        <div className="space-y-3">
++                          <div className="flex items-stretch gap-4">
++                            <div className="flex-1 min-w-0 flex items-center justify-center">
++                              <ThreatArc score={score} color={color}/>
++                            </div>
++                            <Separator orientation="vertical" className="self-stretch"/>
++                            <div className="flex-[2.5] min-w-0 flex items-start justify-evenly rounded-lg border border-border/50 bg-muted/30 p-2">
++                              <CatBar catKey="violent"  value={c.violentCount}  max={maxCat}/>
++                              <Separator orientation="vertical" className="h-8 self-center"/>
++                              <CatBar catKey="property" value={c.propertyCount} max={maxCat}/>
++                              <Separator orientation="vertical" className="h-8 self-center"/>
++                              <CatBar catKey="drug"     value={c.drugCount}     max={maxCat}/>
++                            </div>
++                          </div>
++                          <Chips counts={c.incidentTypeCounts} limit={2}/>
++                          {c.totalCount > 0 && <QuarterlyBanner totalCount={c.totalCount}/>}
++                        </div>
++                      ) : (
++                        <p className="text-sm text-muted-foreground py-4">
++                          {h3Index ? "No crime data for this cell." : "Tap a hex on the map to inspect it."}
++                        </p>
++                      )}
++                    </CardContent>
++                  </Card>
++
++                  {/* Neighbor list */}
++                  {neighbors.length > 0 && (
++                    <div className="space-y-2">
++                      <h4 className="text-sm font-medium text-muted-foreground px-1">Adjacent Cells</h4>
++                      <div className="space-y-1.5">
++                        {[...neighbors].sort((a, b) => b.totalCount - a.totalCount).map(n => (
++                          <NeighborListRow key={n.h3Index} item={n}/>
++                        ))}
++                      </div>
++                    </div>
++                  )}
++                  {neighbors.length === 0 && (
++                    <p className="text-sm text-muted-foreground text-center py-4">No neighbor data.</p>
++                  )}
++                </div>
++              </ScrollArea>
++            </TabsContent>
++
++            <TabsContent value="map" className="flex-1 min-h-0 mt-3 relative">
++              {neighbors.length > 0 && h3Index ? (
++                <HoneycombMap
++                  centerH3={h3Index}
++                  neighbors={neighbors}
++                  onSelect={i => setSelectedNeighborIdx(prev => prev === i ? null : i)}
++                  selectedIndex={selectedNeighborIdx}
++                />
++              ) : (
++                <p className="text-sm text-muted-foreground text-center py-8">No neighbor data.</p>
++              )}
++              {selectedNeighbor && (
++                <NeighborDetail item={selectedNeighbor} onClose={() => setSelectedNeighborIdx(null)}/>
++              )}
++            </TabsContent>
++          </Tabs>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/src/pages/live-map/Map.tsx b/src/pages/live-map/Map.tsx
+index 3e2c30e..26405ab 100644
+--- a/src/pages/live-map/Map.tsx
++++ b/src/pages/live-map/Map.tsx
+@@ -2,20 +2,65 @@ import {
+   useEffect,
+   useRef,
+   useState,
++  useMemo,
+   forwardRef,
+   useImperativeHandle,
++  type Dispatch,
++  type MutableRefObject,
++  type SetStateAction,
+ } from "react";
+ import mapboxgl from "mapbox-gl";
+ import "mapbox-gl/dist/mapbox-gl.css";
+ import { useTheme } from "@/components/ThemeProvider";
+ import { api } from "@/utils/api";
+ import { ReportType } from "@/types/report.type";
+-import { AreaType } from "@/types/area.type";
+ import type { PrecinctGeoJson } from "@/utils/police-precincts-api";
+-import { loadMapIcons, ensureIconsLoaded, getReportMarkerStyle, loadStationIcon, STATION_ICON_ID } from "@/utils/map-marker-icons";
++import {
++  loadMapIcons,
++  ensureIconsLoaded,
++  getReportMarkerStyle,
++  loadStationIcon,
++  STATION_ICON_ID,
++} from "@/utils/map-marker-icons";
++import {
++  addNationalCrimeHexSourceAndLayer,
++  addReportHeatmapAndHotspotLayers,
++  CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID,
++  CW_UNIFIED_CRIME_HEX_NATIONAL_OUTLINE_LAYER_ID,
++  CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID,
++} from "@/pages/live-map/map-layer-adders";
++import type { CwUnifiedCrimeHexItem, HexSafetyIntent } from "@/utils/cw-unified-crime-hex-api";
++import { crimeHexToGeoJson } from "@/utils/crime-hex-geojson";
++import {
++  capItemsForDisplay,
++  filterHexItemsByMapBounds,
++  scoreCrimeHexItemsForDisplay,
++} from "@/utils/crime-hex-viewport";
++import { zoomToHexResolution, aggregateHexesToResolution } from "@/utils/hex-resolution";
++
+ /** Same as enterprise: wolf-green for precinct boundaries and stations */
+ const WOLF_GREEN = "#1a4f38";
+ 
++/** Max zoom for report layer — same as enterprise; limits street-level zoom for POPIA (report location privacy) */
++const REPORT_MAX_ZOOM = 16;
++
++const HOTSPOT_RADIUS_MIN_M = 20;
++const HOTSPOT_RADIUS_MAX_M = 2000;
++
++const MAX_HEXES_DISPLAY = 200_000;
++
++/** Keeps moveend handler shallow for Sonar (no nested setTimeout callback >4 levels). */
++function scheduleDebouncedMapMoveVersion(
++  debounceRef: MutableRefObject<ReturnType<typeof setTimeout> | null>,
++  setMapMoveVersion: Dispatch<SetStateAction<number>>,
++): void {
++  if (debounceRef.current) clearTimeout(debounceRef.current);
++  debounceRef.current = setTimeout(() => {
++    debounceRef.current = null;
++    setMapMoveVersion((v) => v + 1);
++  }, 160);
++}
++
+ const HIDDEN_REPORT_TYPES = new Set([
+   "Sexual Offences",
+   "Rape & Sexual Assault",
+@@ -25,41 +70,22 @@ const HIDDEN_REPORT_TYPES = new Set([
+   "Sexual Offence - Rape",
+ ]);
+ 
+-const getAreaColor = (_index: number, isSelected: boolean) => {
+-  return isSelected ? "#dc2626" : "#ef4444";
+-};
+-
+ function isGeoJSONSource(
+   source: mapboxgl.Source | undefined
+ ): source is mapboxgl.GeoJSONSource {
+   return source != null && "setData" in source;
+ }
+ 
+-function isPointInPolygon(point: [number, number], polygon: number[][]): boolean {
+-  let inside = false;
+-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+-    const xi = polygon[i][0],
+-      yi = polygon[i][1];
+-    const xj = polygon[j][0],
+-      yj = polygon[j][1];
+-
+-    const intersect =
+-      yi > point[1] !== yj > point[1] &&
+-      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+-    if (intersect) inside = !inside;
+-  }
+-  return inside;
+-}
+-
+ function flyToMap(
+   mapInstance: mapboxgl.Map,
+   lat: number,
+   lng: number,
+   zoom: number
+ ): void {
++  const clampedZoom = Math.min(zoom, REPORT_MAX_ZOOM);
+   mapInstance.flyTo({
+     center: [lng, lat],
+-    zoom,
++    zoom: clampedZoom,
+     duration: 2000,
+     essential: true,
+   });
+@@ -71,60 +97,35 @@ interface MapProps {
+     radius: number;
+   }) => void;
+   selectedReport?: ReportType | null;
+-  selectedAreaId: string | null;
+-  setSelectedAreaId: React.Dispatch<React.SetStateAction<string | null>>; // NOSONAR: used in area click handlers (closure)
+   setSelectedReport?: (reportId: string | null) => void;
+   onPrecinctSelect?: (stationName: string) => void;
+-  areas: AreaType[];
+   precinctData?: PrecinctGeoJson | null;
+   mapFilters: {
+     layers: {
+-      areas: boolean;
+       reports?: boolean;
+       precinctBoundaries?: boolean;
+       precinctStations?: boolean;
+       heatmap?: boolean;
++      cwUnifiedCrimeHexNational?: boolean;
++      hotspots?: boolean;
+     };
+     filters?: {
+-      areas: string[];
+       excludedTypes?: string[];
+     };
+   };
+   onMarkerTypesChange?: (types: string[]) => void;
++  /** National SA crime hex (from MapPage / getAllCrimeHex — wolf-server proxy, not viewport pathfinder). */
++  nationalHexAllItems?: CwUnifiedCrimeHexItem[];
++  /** Selected safety intent for hex coloring. */
++  safetyIntent?: HexSafetyIntent;
++  hotspotRadiusMeters?: number;
++  onCrimeHexSelect?: (h3Index: string) => void;
+ }
+ 
+ export interface MapRef {
+   flyTo: (lat: number, lng: number, zoom?: number) => void;
+ }
+ 
+-function updateAreaLayerVisibility(
+-  map: mapboxgl.Map,
+-  area: AreaType,
+-  index: number,
+-  mapFilters: MapProps["mapFilters"]
+-): void {
+-  const fillLayerId = `area-fill-${index}`;
+-  const outlineLayerId = `area-outline-${index}`;
+-  const labelLayerId = `area-label-${index}`;
+-  const isAreaVisible = mapFilters.layers.areas;
+-  const filterIds = mapFilters.filters?.areas ?? [];
+-  const isAreaFiltered = filterIds.length > 0 && !filterIds.includes(area._id);
+-  const visibility = isAreaVisible ? "visible" : "none";
+-
+-  if (map.getLayer(fillLayerId)) {
+-    map.setLayoutProperty(fillLayerId, "visibility", visibility);
+-    map.setPaintProperty(fillLayerId, "fill-opacity", isAreaFiltered ? 0.05 : 0.3);
+-  }
+-  if (map.getLayer(outlineLayerId)) {
+-    map.setLayoutProperty(outlineLayerId, "visibility", visibility);
+-    map.setPaintProperty(outlineLayerId, "line-opacity", isAreaFiltered ? 0.2 : 1);
+-  }
+-  if (map.getLayer(labelLayerId)) {
+-    map.setLayoutProperty(labelLayerId, "visibility", visibility);
+-    map.setPaintProperty(labelLayerId, "text-opacity", isAreaFiltered ? 0.3 : 1);
+-  }
+-}
+-
+ function buildMarkerFeature(
+   report: { _id: string; type?: string; coordinates: GeoJSON.Point },
+   isSelected: boolean,
+@@ -145,52 +146,10 @@ function buildMarkerFeature(
+   };
+ }
+ 
+-/** Shared marker layer config — used in initial load and theme-change re-init. */
+-function addMarkerLayers(map: mapboxgl.Map, heatmapVisible: boolean): void {
+-  const notTypeFiltered = ["!", ["get", "isTypeFiltered"]] as ["!", unknown[]];
+-
+-  // 1. Selection highlight ring — sits under icons at the pin base
+-  map.addLayer({
+-    id: "marker-selection-ring",
+-    type: "circle",
+-    source: "markers",
+-    filter: ["all", ["==", ["get", "isSelected"], true], notTypeFiltered],
+-    paint: {
+-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 10, 14, 16, 18, 22],
+-      "circle-color": WOLF_GREEN,
+-      "circle-opacity": 0.18,
+-      "circle-stroke-width": 2.5,
+-      "circle-stroke-color": WOLF_GREEN,
+-      "circle-stroke-opacity": 0.6,
+-      "circle-pitch-alignment": "map",
+-    },
+-  });
++const notTypeFiltered = ["!", ["get", "isTypeFiltered"]] as ["!", unknown[]];
+ 
+-  // 2. Heatmap (below icons, above ring)
+-  map.addLayer({
+-    id: "report-heatmap",
+-    type: "heatmap",
+-    source: "markers",
+-    maxzoom: 16,
+-    layout: { visibility: heatmapVisible ? "visible" : "none" },
+-    filter: ["all", ["!", ["get", "isFiltered"]], notTypeFiltered],
+-    paint: {
+-      "heatmap-weight": 1,
+-      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 2, 16, 1.5],
+-      "heatmap-color": [
+-        "interpolate", ["linear"], ["heatmap-density"],
+-        0, "rgba(0,0,0,0)",
+-        0.2, "rgba(239,68,68,0.4)",
+-        0.4, "rgba(249,115,22,0.6)",
+-        0.6, "rgba(234,179,8,0.7)",
+-        1, "rgba(220,38,38,0.85)",
+-      ],
+-      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 15, 10, 25, 14, 50],
+-      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 14, 0.5, 18, 0.2],
+-    },
+-  });
+-
+-  // 3. Report icon markers (topmost) — type-filtered features are fully hidden
++/** Report symbol layer — anchor for inserts below (national hex, precincts, POI, ring). */
++function addMarkersSymbolLayer(map: mapboxgl.Map): void {
+   map.addLayer({
+     id: "markers",
+     type: "symbol",
+@@ -219,19 +178,42 @@ function addMarkerLayers(map: mapboxgl.Map, heatmapVisible: boolean): void {
+   });
+ }
+ 
++/** Selection ring directly under marker icons. */
++function addMarkerSelectionRing(map: mapboxgl.Map): void {
++  map.addLayer(
++    {
++      id: "marker-selection-ring",
++      type: "circle",
++      source: "markers",
++      filter: ["all", ["==", ["get", "isSelected"], true], notTypeFiltered],
++      paint: {
++        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 10, 14, 16, 18, 22],
++        "circle-color": WOLF_GREEN,
++        "circle-opacity": 0.18,
++        "circle-stroke-width": 2.5,
++        "circle-stroke-color": WOLF_GREEN,
++        "circle-stroke-opacity": 0.6,
++        "circle-pitch-alignment": "map",
++      },
++    },
++    "markers"
++  );
++}
++
+ const LiveMap = forwardRef<MapRef, MapProps>(
+   (
+     {
+       onViewportChange,
+       selectedReport,
+-      selectedAreaId,
+-      setSelectedAreaId,
+       setSelectedReport,
+       onPrecinctSelect,
+-      areas,
+       precinctData,
+       mapFilters,
+       onMarkerTypesChange,
++      nationalHexAllItems = [],
++      safetyIntent = "travel",
++      hotspotRadiusMeters = 80,
++      onCrimeHexSelect,
+     },
+     ref
+   ) => {
+@@ -246,43 +228,39 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+     >([]);
+     const [error, setError] = useState<string | null>(null);
+     const [mapLoaded, setMapLoaded] = useState(false);
++    const [mapMoveVersion, setMapMoveVersion] = useState(0);
++    /** Debounce pan/zoom → React: avoids heavy national-hex + hotspot updates every frame (rAF violations). */
++    const mapMoveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+     const { theme } = useTheme();
+ 
+-    const setupAreaRef = useRef<(area: AreaType, index: number) => void>(() => {});
+-    const isPointInFilteredAreasRef = useRef<(point: [number, number]) => boolean>(() => true);
++    const nationalHexR7 = useMemo(
++      () => (nationalHexAllItems.length > 0 ? aggregateHexesToResolution(nationalHexAllItems, 7) : []),
++      [nationalHexAllItems]
++    );
++    const nationalHexR6 = useMemo(
++      () => (nationalHexAllItems.length > 0 ? aggregateHexesToResolution(nationalHexAllItems, 6) : []),
++      [nationalHexAllItems]
++    );
++
+     const selectedReportRef = useRef(selectedReport);
+     const themeRef = useRef(theme);
+     const mapFiltersRef = useRef(mapFilters);
+     const mapMarkersRef = useRef(mapMarkers);
+-    const areasRef = useRef(areas);
+     const onViewportChangeRef = useRef(onViewportChange);
+     const setSelectedReportRef = useRef(setSelectedReport);
+     const onPrecinctSelectRef = useRef(onPrecinctSelect);
++    const onCrimeHexSelectRef = useRef(onCrimeHexSelect);
+     const precinctDataRef = useRef(precinctData);
+     const prevThemeRef = useRef<string | null>(null);
+     selectedReportRef.current = selectedReport;
+     themeRef.current = theme;
+     mapFiltersRef.current = mapFilters;
+     mapMarkersRef.current = mapMarkers;
+-    areasRef.current = areas;
+     precinctDataRef.current = precinctData;
+     onViewportChangeRef.current = onViewportChange;
+     setSelectedReportRef.current = setSelectedReport;
+     onPrecinctSelectRef.current = onPrecinctSelect;
+-
+-    // Helper function to check if a point is within any of the filtered areas
+-    function isPointInFilteredAreas(point: [number, number]) {
+-      if (!mapFilters.filters.areas.length) return true;
+-
+-      return mapFilters.filters.areas.some((areaId) => {
+-        const area = areas.find((a) => a._id === areaId);
+-        if (!area) return false;
+-
+-        const polygon = (area.geojson.geometries[0] as GeoJSON.Polygon)
+-          .coordinates[0];
+-        return isPointInPolygon(point, polygon);
+-      });
+-    }
++    onCrimeHexSelectRef.current = onCrimeHexSelect;
+ 
+     // Fetch all report markers for the map
+     const fetchMapMarkers = async () => {
+@@ -311,7 +289,6 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+     }, []);
+ 
+ 
+-    // Helper function to calculate radius in kilometers
+     const calculateRadius = (map: mapboxgl.Map) => {
+       const mapWidth = map.getContainer().offsetWidth;
+       const center = map.getCenter();
+@@ -340,165 +317,6 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+       return radius;
+     };
+ 
+-    // Setup area source, layers and interactions
+-    const setupArea = (area: AreaType, index: number) => {
+-      if (!map.current) return;
+-
+-      const sourceId = `area-${index}`;
+-      const fillLayerId = `area-fill-${index}`;
+-      const outlineLayerId = `area-outline-${index}`;
+-      const labelLayerId = `area-label-${index}`;
+-
+-      // Calculate the center of the polygon (Geometry union requires assertion for Polygon)
+-      const coordinates = (area.geojson.geometries[0] as GeoJSON.Polygon).coordinates[0]; // NOSONAR S4325
+-      let centerX = 0;
+-      let centerY = 0;
+-
+-      // Calculate the centroid of the polygon
+-      coordinates.forEach((coord: number[]) => {
+-        centerX += coord[0];
+-        centerY += coord[1];
+-      });
+-
+-      centerX /= coordinates.length;
+-      centerY /= coordinates.length;
+-
+-      // Create GeoJSON with both polygon and center point
+-      const geoJsonWithId = {
+-        type: "FeatureCollection" as const,
+-        features: [
+-          ...area.geojson.geometries.map((geometry) => ({
+-            type: "Feature" as const,
+-            geometry: geometry,
+-            properties: {},
+-          })),
+-          {
+-            type: "Feature" as const,
+-            geometry: {
+-              type: "Point" as const,
+-              coordinates: [centerX, centerY],
+-            },
+-            properties: {
+-              areaId: area._id,
+-              name: area.name,
+-            },
+-          },
+-        ],
+-      };
+-
+-      // Update or add source for this area
+-      const existing = map.current.getSource(sourceId);
+-      if (isGeoJSONSource(existing)) {
+-        existing.setData(geoJsonWithId);
+-      } else {
+-        map.current.addSource(sourceId, {
+-          type: "geojson",
+-          data: geoJsonWithId,
+-        });
+-
+-        map.current.addLayer({
+-          id: fillLayerId,
+-          type: "fill",
+-          source: sourceId,
+-          slot: "bottom",
+-          paint: {
+-            "fill-color": [
+-              "case",
+-              ["==", ["get", "areaId"], selectedAreaId],
+-              getAreaColor(index, true),
+-              getAreaColor(index, false),
+-            ],
+-            "fill-opacity": [
+-              "case",
+-              ["==", ["get", "areaId"], selectedAreaId],
+-              0.3,
+-              0.2,
+-            ],
+-          },
+-          layout: {
+-            visibility: "visible",
+-          },
+-        });
+-
+-        map.current.addLayer({
+-          id: outlineLayerId,
+-          type: "line",
+-          source: sourceId,
+-          slot: "bottom",
+-          paint: {
+-            "line-color": getAreaColor(index, false),
+-          },
+-          layout: {
+-            visibility: "visible",
+-          },
+-        });
+-
+-        // Add text layer for area name at the calculated center
+-        map.current.addLayer({
+-          id: labelLayerId,
+-          type: "symbol",
+-          source: sourceId,
+-          slot: "top",
+-          layout: {
+-            "text-field": ["get", "name"],
+-            "text-size": 12,
+-            "text-anchor": "center",
+-            "text-allow-overlap": true,
+-            "text-ignore-placement": true,
+-            "text-padding": 2,
+-            "text-max-width": 8,
+-            "text-line-height": 1.2,
+-            visibility: "visible",
+-          },
+-          paint: {
+-            "text-color": "black",
+-            "text-halo-width": 2,
+-            "text-halo-color": "white",
+-            "text-opacity": [
+-              "case",
+-              ["==", ["get", "areaId"], selectedAreaId],
+-              1,
+-              0.8,
+-            ],
+-          },
+-          filter: ["==", ["geometry-type"], "Point"],
+-        });
+-
+-        map.current.on("click", labelLayerId, () => {
+-          setSelectedAreaId(area._id);
+-          map.current?.flyTo({
+-            center: [
+-              (area.geojson.geometries[0] as GeoJSON.Polygon)
+-                ?.coordinates[0][0][0],
+-              (area.geojson.geometries[0] as GeoJSON.Polygon)
+-                ?.coordinates[0][0][1],
+-            ],
+-            zoom: 12,
+-          });
+-        });
+-
+-        map.current.on("click", fillLayerId, () => {
+-          setSelectedAreaId(area._id);
+-        });
+-
+-        // Add hover effect for this area
+-        map.current.on("mouseenter", fillLayerId, () => {
+-          if (map.current) {
+-            map.current.getCanvas().style.cursor = "pointer";
+-          }
+-        });
+-
+-        map.current.on("mouseleave", fillLayerId, () => {
+-          if (map.current) {
+-            map.current.getCanvas().style.cursor = "";
+-          }
+-        });
+-      }
+-    };
+-
+-    setupAreaRef.current = setupArea;
+-    isPointInFilteredAreasRef.current = isPointInFilteredAreas;
+-
+     useEffect(() => {
+       if (!mapContainer.current) return;
+ 
+@@ -527,12 +345,22 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+       map.current = new mapboxgl.Map({
+         container: mapContainer.current,
+         style: mapStyle,
+-        zoom: currentReport ? 16 : 11,
++        zoom: currentReport ? REPORT_MAX_ZOOM : 11,
+         center: [initial[0], initial[1]],
+         pitch: 45,
+         bearing: 0,
+         antialias: true,
+         maxPitch: 85,
++        maxZoom: REPORT_MAX_ZOOM,
++        /** Stops requests to events.mapbox.com (avoids console noise when telemetry DNS is blocked). */
++        performanceMetricsCollection: false,
++        collectResourceTiming: false,
++        transformRequest: (url) => {
++          if (url.includes("events.mapbox.com")) {
++            return { url: "data:application/json;charset=utf-8,[]" };
++          }
++          return { url };
++        },
+       });
+ 
+       // light-v11 / dark-v11 (same as enterprise) – no extra style config needed
+@@ -554,7 +382,6 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+         try {
+           // Fix initial size; container may not have had final dimensions yet (e.g. mobile layout)
+           map.current?.resize();
+-          areasRef.current.forEach((area, index) => setupAreaRef.current(area, index));
+ 
+         // Trigger initial viewport change
+         const onViewport = onViewportChangeRef.current;
+@@ -579,7 +406,6 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+           if (reportId === b._id) return -1;
+           return 0;
+         });
+-        const checkFiltered = isPointInFilteredAreasRef.current;
+         const initExcluded = new Set(mapFiltersRef.current.filters?.excludedTypes ?? []);
+         map.current.addSource("markers", {
+           type: "geojson",
+@@ -589,27 +415,18 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+               buildMarkerFeature(
+                 report,
+                 reportId === report._id,
+-                !checkFiltered([report.coordinates.coordinates[0], report.coordinates.coordinates[1]]),
++                false,
+                 report.type ? initExcluded.has(report.type) : false,
+               )
+             ),
+           },
+         });
+ 
+-        addMarkerLayers(map.current, false);
+-
+-        map.current.on("click", "markers", (e) => {
+-          const feature = e.features?.[0];
+-          if (feature?.properties?.id) setSelectedReportRef.current?.(feature.properties.id);
+-        });
+-        map.current.on("mouseenter", "markers", () => {
+-          if (map.current) map.current.getCanvas().style.cursor = "pointer";
+-        });
+-        map.current.on("mouseleave", "markers", () => {
+-          if (map.current) map.current.getCanvas().style.cursor = "";
+-        });
++        // Layer order (bottom → top): Crime Risk (SA) → SAPS Boundaries → Community Incidents → Places → Police stations → Adjustable clusters → Density overview. Anchor: markers symbol.
++        addMarkersSymbolLayer(map.current);
++        addNationalCrimeHexSourceAndLayer(map.current);
+ 
+-        // ── Precinct layers ──
++        // ── Precinct layers (SAPS boundaries) ──
+         const emptyFc: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+ 
+         // Seed with already-cached data (e.g. from localStorage) so boundaries show immediately on reload
+@@ -627,48 +444,68 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+         const isDark = themeRef.current === "dark";
+         const precinctFillOpacity = isDark ? 0.3 : 0.22;
+ 
+-        map.current.addLayer({
+-          id: "precinct-fill",
+-          type: "fill",
+-          source: "precinct-boundaries",
+-          slot: "bottom",
+-          paint: {
+-            "fill-color": WOLF_GREEN,
+-            "fill-opacity": precinctFillOpacity,
++        map.current.addLayer(
++          {
++            id: "precinct-fill",
++            type: "fill",
++            source: "precinct-boundaries",
++            paint: {
++              "fill-color": WOLF_GREEN,
++              "fill-opacity": precinctFillOpacity,
++            },
++            layout: { visibility: mapFiltersRef.current.layers.precinctBoundaries ? "visible" : "none" },
+           },
+-          layout: { visibility: mapFiltersRef.current.layers.precinctBoundaries ? "visible" : "none" },
+-        });
++          "markers"
++        );
+ 
+-        map.current.addLayer({
+-          id: "precinct-outline",
+-          type: "line",
+-          source: "precinct-boundaries",
+-          slot: "bottom",
+-          paint: {
+-            "line-color": WOLF_GREEN,
+-            "line-width": 2.5,
++        map.current.addLayer(
++          {
++            id: "precinct-outline",
++            type: "line",
++            source: "precinct-boundaries",
++            paint: {
++              "line-color": WOLF_GREEN,
++              "line-width": 2.5,
++            },
++            layout: { visibility: mapFiltersRef.current.layers.precinctBoundaries ? "visible" : "none" },
+           },
+-          layout: { visibility: mapFiltersRef.current.layers.precinctBoundaries ? "visible" : "none" },
+-        });
++          "markers"
++        );
+ 
+-        map.current.addLayer({
+-          id: "precinct-label",
+-          type: "symbol",
+-          source: "precinct-boundaries",
+-          layout: {
+-            "text-field": ["coalesce", ["get", "COMPNT_NM"], ["get", "Station"], ["get", "name"], ""],
+-            "text-size": 11,
+-            "text-anchor": "center",
+-            "text-max-width": 8,
+-            "text-line-height": 1.2,
+-            visibility: mapFiltersRef.current.layers.precinctBoundaries ? "visible" : "none",
+-          },
+-          paint: {
+-            "text-color": WOLF_GREEN,
+-            "text-halo-width": 1.5,
+-            "text-halo-color": "white",
+-            "text-opacity": 0.85,
++        map.current.addLayer(
++          {
++            id: "precinct-label",
++            type: "symbol",
++            source: "precinct-boundaries",
++            layout: {
++              "text-field": ["coalesce", ["get", "COMPNT_NM"], ["get", "Station"], ["get", "name"], ""],
++              "text-size": 11,
++              "text-anchor": "center",
++              "text-max-width": 8,
++              "text-line-height": 1.2,
++              visibility: mapFiltersRef.current.layers.precinctBoundaries ? "visible" : "none",
++            },
++            paint: {
++              "text-color": WOLF_GREEN,
++              "text-halo-width": 1.5,
++              "text-halo-color": "white",
++              "text-opacity": 0.85,
++            },
+           },
++          "markers"
++        );
++
++        addMarkerSelectionRing(map.current);
++
++        map.current.on("click", "markers", (e) => {
++          const feature = e.features?.[0];
++          if (feature?.properties?.id) setSelectedReportRef.current?.(feature.properties.id);
++        });
++        map.current.on("mouseenter", "markers", () => {
++          if (map.current) map.current.getCanvas().style.cursor = "pointer";
++        });
++        map.current.on("mouseleave", "markers", () => {
++          if (map.current) map.current.getCanvas().style.cursor = "";
+         });
+ 
+         map.current.addLayer({
+@@ -694,6 +531,22 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+           },
+         });
+ 
++        addReportHeatmapAndHotspotLayers(map.current);
++
++        if (map.current.getLayer(CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID)) {
++          map.current.on("click", CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, (e) => {
++            const feat = e.features?.[0];
++            const h3 = (feat?.properties?.h3Index ?? (feat as { id?: string })?.id) as string | undefined;
++            if (h3) onCrimeHexSelectRef.current?.(String(h3));
++          });
++          map.current.on("mouseenter", CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, () => {
++            if (map.current?.getCanvas()) map.current.getCanvas().style.cursor = "pointer";
++          });
++          map.current.on("mouseleave", CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, () => {
++            if (map.current?.getCanvas()) map.current.getCanvas().style.cursor = "";
++          });
++        }
++
+         // Click handlers for precinct layers – open detail drawer
+         for (const layerId of ["precinct-fill", "precinct-station-dots"]) {
+           map.current.on("click", layerId, (e) => {
+@@ -778,6 +631,11 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+               },
+               radius,
+             });
++            const layers = mapFiltersRef.current.layers;
++            const needsMoveRefresh =
++              layers?.cwUnifiedCrimeHexNational === true || layers?.hotspots === true;
++            if (!needsMoveRefresh) return;
++            scheduleDebouncedMapMoveVersion(mapMoveDebounceRef, setMapMoveVersion);
+           }
+         } catch (err) {
+           setError(err?.message ?? String(err));
+@@ -792,6 +650,9 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+       }
+ 
+       return () => {
++        const pendingMoveDebounce = mapMoveDebounceRef.current;
++        mapMoveDebounceRef.current = null;
++        if (pendingMoveDebounce) clearTimeout(pendingMoveDebounce);
+         map.current?.remove();
+       };
+     }, []);
+@@ -844,7 +705,6 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+           if (reportId === b._id) return -1;
+           return 0;
+         });
+-        const checkFiltered = isPointInFilteredAreasRef.current;
+         const themeExcluded = new Set(mapFiltersRef.current.filters?.excludedTypes ?? []);
+         map.current.addSource("markers", {
+           type: "geojson",
+@@ -854,52 +714,73 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+               buildMarkerFeature(
+                 report,
+                 reportId === report._id,
+-                !checkFiltered([report.coordinates.coordinates[0], report.coordinates.coordinates[1]]),
++                false,
+                 report.type ? themeExcluded.has(report.type) : false,
+               )
+             ),
+           },
+         });
+ 
+-        addMarkerLayers(map.current, !!mapFiltersRef.current.layers.heatmap);
+-
+-        areasRef.current.forEach((area, index) => setupAreaRef.current(area, index));
+-
+-        // Re-add precinct layers after style change, seeding with already-cached data
+-        const emptyFc: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+-        const cachedPc = precinctDataRef.current;
+-        const reloadBoundaries = cachedPc
+-          ? { type: "FeatureCollection" as const, features: cachedPc.features.filter((f) => f.geometry?.type === "Polygon" || f.geometry?.type === "MultiPolygon") }
+-          : emptyFc;
+-        const reloadPoints = cachedPc
+-          ? { type: "FeatureCollection" as const, features: cachedPc.features.filter((f) => f.geometry?.type === "Point") }
+-          : emptyFc;
+-        map.current.addSource("precinct-boundaries", { type: "geojson", data: reloadBoundaries });
+-        map.current.addSource("precinct-stations", { type: "geojson", data: reloadPoints });
++        addMarkersSymbolLayer(map.current);
++        addNationalCrimeHexSourceAndLayer(map.current);
++
++        const emptyFcTh: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
++        const cachedPcTh = precinctDataRef.current;
++        const reloadBoundariesTh = cachedPcTh
++          ? { type: "FeatureCollection" as const, features: cachedPcTh.features.filter((f) => f.geometry?.type === "Polygon" || f.geometry?.type === "MultiPolygon") }
++          : emptyFcTh;
++        const reloadPointsTh = cachedPcTh
++          ? { type: "FeatureCollection" as const, features: cachedPcTh.features.filter((f) => f.geometry?.type === "Point") }
++          : emptyFcTh;
++        map.current.addSource("precinct-boundaries", { type: "geojson", data: reloadBoundariesTh });
++        map.current.addSource("precinct-stations", { type: "geojson", data: reloadPointsTh });
++
++        const filtersTh = mapFiltersRef.current;
++        const isDarkTh = theme === "dark";
++        const precinctFillOpacityTh = isDarkTh ? 0.3 : 0.22;
++
++        map.current.addLayer(
++          {
++            id: "precinct-fill", type: "fill", source: "precinct-boundaries",
++            paint: { "fill-color": WOLF_GREEN, "fill-opacity": precinctFillOpacityTh },
++            layout: { visibility: filtersTh.layers.precinctBoundaries ? "visible" : "none" },
++          },
++          "markers"
++        );
++        map.current.addLayer(
++          {
++            id: "precinct-outline", type: "line", source: "precinct-boundaries",
++            paint: { "line-color": WOLF_GREEN, "line-width": 2.5 },
++            layout: { visibility: filtersTh.layers.precinctBoundaries ? "visible" : "none" },
++          },
++          "markers"
++        );
++        map.current.addLayer(
++          {
++            id: "precinct-label", type: "symbol", source: "precinct-boundaries",
++            layout: {
++              "text-field": ["coalesce", ["get", "COMPNT_NM"], ["get", "Station"], ["get", "name"], ""],
++              "text-size": 11, "text-anchor": "center", "text-max-width": 8,
++              visibility: filtersTh.layers.precinctBoundaries ? "visible" : "none",
++            },
++            paint: { "text-color": WOLF_GREEN, "text-halo-width": 1.5, "text-halo-color": "white", "text-opacity": 0.85 },
++          },
++          "markers"
++        );
+ 
+-        const filters = mapFiltersRef.current;
+-        const isDark = theme === "dark";
+-        const precinctFillOpacity = isDark ? 0.3 : 0.22;
++        addMarkerSelectionRing(map.current);
+ 
+-        map.current.addLayer({
+-          id: "precinct-fill", type: "fill", source: "precinct-boundaries", slot: "bottom",
+-          paint: { "fill-color": WOLF_GREEN, "fill-opacity": precinctFillOpacity },
+-          layout: { visibility: filters.layers.precinctBoundaries ? "visible" : "none" },
++        map.current.on("click", "markers", (e) => {
++          const feature = e.features?.[0];
++          if (feature?.properties?.id) setSelectedReportRef.current?.(feature.properties.id);
+         });
+-        map.current.addLayer({
+-          id: "precinct-outline", type: "line", source: "precinct-boundaries", slot: "bottom",
+-          paint: { "line-color": WOLF_GREEN, "line-width": 2.5 },
+-          layout: { visibility: filters.layers.precinctBoundaries ? "visible" : "none" },
++        map.current.on("mouseenter", "markers", () => {
++          if (map.current) map.current.getCanvas().style.cursor = "pointer";
+         });
+-        map.current.addLayer({
+-          id: "precinct-label", type: "symbol", source: "precinct-boundaries",
+-          layout: {
+-            "text-field": ["coalesce", ["get", "COMPNT_NM"], ["get", "Station"], ["get", "name"], ""],
+-            "text-size": 11, "text-anchor": "center", "text-max-width": 8,
+-            visibility: filters.layers.precinctBoundaries ? "visible" : "none",
+-          },
+-          paint: { "text-color": WOLF_GREEN, "text-halo-width": 1.5, "text-halo-color": "white", "text-opacity": 0.85 },
++        map.current.on("mouseleave", "markers", () => {
++          if (map.current) map.current.getCanvas().style.cursor = "";
+         });
++
+         map.current.addLayer({
+           id: "precinct-station-dots", type: "symbol", source: "precinct-stations",
+           layout: {
+@@ -909,11 +790,27 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+             "icon-anchor": "center",
+             "text-field": ["coalesce", ["get", "COMPNT_NM"], ["get", "Station"], ["get", "name"], ""],
+             "text-size": 10, "text-offset": [0, 1.6], "text-anchor": "top", "text-max-width": 8,
+-            visibility: filters.layers.precinctStations ? "visible" : "none",
++            visibility: filtersTh.layers.precinctStations ? "visible" : "none",
+           },
+           paint: { "text-color": "#1a1a1a", "text-halo-width": 1.5, "text-halo-color": "white" },
+         });
+ 
++        addReportHeatmapAndHotspotLayers(map.current);
++
++        if (map.current.getLayer(CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID)) {
++          map.current.on("click", CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, (e) => {
++            const feat = e.features?.[0];
++            const h3 = (feat?.properties?.h3Index ?? (feat as { id?: string })?.id) as string | undefined;
++            if (h3) onCrimeHexSelectRef.current?.(String(h3));
++          });
++          map.current.on("mouseenter", CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, () => {
++            if (map.current?.getCanvas()) map.current.getCanvas().style.cursor = "pointer";
++          });
++          map.current.on("mouseleave", CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, () => {
++            if (map.current?.getCanvas()) map.current.getCanvas().style.cursor = "";
++          });
++        }
++
+         } catch (err) {
+           setError(err?.message ?? String(err));
+         }
+@@ -940,15 +837,13 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+           if (selectedReport?._id === b._id) return -1;
+           return 0;
+         });
+-        const checkFiltered = isPointInFilteredAreasRef.current;
+         const excluded = new Set(mapFilters.filters?.excludedTypes ?? []);
+         const markerFeatures = sortedMarkers.map((report) => {
+-          const areaFiltered = !checkFiltered([report.coordinates.coordinates[0], report.coordinates.coordinates[1]]);
+           const typeFiltered = report.type ? excluded.has(report.type) : false;
+           return buildMarkerFeature(
+             report,
+             selectedReport?._id === report._id,
+-            areaFiltered,
++            false,
+             typeFiltered,
+           );
+         });
+@@ -966,9 +861,9 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+       } catch (err) {
+         setError(err?.message ?? String(err));
+       }
+-    }, [mapMarkers, selectedReport, mapFilters.filters.areas, mapFilters.filters.excludedTypes, areas]);
++    }, [mapMarkers, selectedReport, mapFilters.filters?.excludedTypes]);
+ 
+-    // Update the effect that handles layer visibility based on filters
++    // Update marker opacity paint when filters change (type / area dimming)
+     useEffect(() => {
+       const mapInstance = map.current;
+       if (!mapInstance) return;
+@@ -982,14 +877,10 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+             1,
+           ]);
+         }
+-
+-        areas.forEach((area, index) => {
+-          updateAreaLayerVisibility(mapInstance, area, index, mapFilters);
+-        });
+       } catch (err) {
+         setError(err?.message ?? String(err));
+       }
+-    }, [mapFilters, areas]);
++    }, [mapFilters]);
+ 
+     // Update precinct data sources when data changes
+     useEffect(() => {
+@@ -1034,22 +925,101 @@ const LiveMap = forwardRef<MapRef, MapProps>(
+ 
+     // Toggle heatmap layer visibility
+     useEffect(() => {
+-      if (!map.current?.getLayer("report-heatmap")) return;
++      if (!map.current || !mapLoaded) return;
++      if (!map.current.getLayer("report-heatmap")) return;
+       map.current.setLayoutProperty(
+         "report-heatmap",
+         "visibility",
+         mapFilters.layers.heatmap ? "visible" : "none",
+       );
+-    }, [mapFilters.layers.heatmap]);
++    }, [mapFilters.layers.heatmap, mapLoaded]);
++
++    // National crime hex (SA) — data from getAllCrimeHex (wolf-server proxy / cache), not viewport pathfinder
++    useEffect(() => {
++      const mapInstance = map.current;
++      const source = mapInstance?.getSource(CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID);
++      if (!mapInstance || !isGeoJSONSource(source) || !mapLoaded) return;
++
++      if (!mapFilters.layers?.cwUnifiedCrimeHexNational || nationalHexAllItems.length === 0) {
++        source.setData({ type: "FeatureCollection", features: [] });
++        return;
++      }
++      const zoom = mapInstance.getZoom();
++      const targetRes = zoomToHexResolution(zoom);
++      let pool: typeof nationalHexAllItems;
++      if (targetRes === 8) pool = nationalHexAllItems;
++      else if (targetRes === 7) pool = nationalHexR7;
++      else pool = nationalHexR6;
++      const bounds = mapInstance.getBounds();
++      const viewItems = filterHexItemsByMapBounds(
++        pool,
++        bounds.getWest(),
++        bounds.getSouth(),
++        bounds.getEast(),
++        bounds.getNorth()
++      );
++      const capped = capItemsForDisplay(viewItems, MAX_HEXES_DISPLAY);
++      const itemsToRender = scoreCrimeHexItemsForDisplay(capped, safetyIntent);
++      const geojson = crimeHexToGeoJson(itemsToRender);
++      source.setData(geojson);
++    }, [
++      mapFilters.layers?.cwUnifiedCrimeHexNational,
++      nationalHexAllItems,
++      nationalHexR7,
++      nationalHexR6,
++      mapMoveVersion,
++      mapLoaded,
++      safetyIntent,
++    ]);
++
++    useEffect(() => {
++      const mapInstance = map.current;
++      if (!mapInstance || !mapLoaded) return;
++      const vis = mapFilters.layers?.cwUnifiedCrimeHexNational ? "visible" : "none";
++      if (mapInstance.getLayer(CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID)) {
++        mapInstance.setLayoutProperty(CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID, "visibility", vis);
++      }
++      if (mapInstance.getLayer(CW_UNIFIED_CRIME_HEX_NATIONAL_OUTLINE_LAYER_ID)) {
++        mapInstance.setLayoutProperty(CW_UNIFIED_CRIME_HEX_NATIONAL_OUTLINE_LAYER_ID, "visibility", vis);
++      }
++    }, [mapFilters.layers?.cwUnifiedCrimeHexNational, mapLoaded]);
++
++    useEffect(() => {
++      const mapInstance = map.current;
++      if (!mapInstance?.getLayer("report-hotspots") || !mapFilters.layers.hotspots) return;
++
++      const meters = Math.min(
++        HOTSPOT_RADIUS_MAX_M,
++        Math.max(HOTSPOT_RADIUS_MIN_M, hotspotRadiusMeters ?? 80)
++      );
++      const center = mapInstance.getCenter();
++      const zoom = mapInstance.getZoom();
++      const lat = center.lat * (Math.PI / 180);
++      const cosLat = Math.cos(lat);
++      const metersPerPixel = (40075000 * cosLat) / (256 * Math.pow(2, zoom));
++      const radiusPx = Math.max(4, meters / metersPerPixel);
++
++      mapInstance.setPaintProperty("report-hotspots", "circle-radius", radiusPx);
++    }, [mapFilters.layers.hotspots, hotspotRadiusMeters, mapMoveVersion, mapLoaded]);
++
++    useEffect(() => {
++      if (!map.current || !mapLoaded) return;
++      if (!map.current.getLayer("report-hotspots")) return;
++      map.current.setLayoutProperty(
++        "report-hotspots",
++        "visibility",
++        mapFilters.layers.hotspots ? "visible" : "none",
++      );
++    }, [mapFilters.layers.hotspots, mapLoaded]);
+ 
+     // Toggle report markers + selection ring visibility
+     useEffect(() => {
+-      if (!map.current) return;
++      if (!map.current || !mapLoaded) return;
+       const vis = mapFilters.layers.reports === false ? "none" : "visible";
+       for (const id of ["markers", "marker-selection-ring"]) {
+         if (map.current.getLayer(id)) map.current.setLayoutProperty(id, "visibility", vis);
+       }
+-    }, [mapFilters.layers.reports]);
++    }, [mapFilters.layers.reports, mapLoaded]);
+ 
+     // Expose methods through ref
+     useImperativeHandle(ref, () => ({
+diff --git a/src/pages/live-map/MapPage.tsx b/src/pages/live-map/MapPage.tsx
+index 627e829..2e7e55d 100644
+--- a/src/pages/live-map/MapPage.tsx
++++ b/src/pages/live-map/MapPage.tsx
+@@ -1,4 +1,5 @@
+ import LiveMap, { MapRef } from "@/pages/live-map/Map";
++import CrimeHexDrawer from "@/pages/live-map/CrimeHexDrawer";
+ import { ThemeProvider } from "@/components/ThemeProvider";
+ import Sidebar from "@/components/Sidebar";
+ import ReportsSidebar from "@/pages/live-map/ReportsSidebar";
+@@ -6,9 +7,18 @@ import PrecinctDetailDrawer from "@/pages/live-map/PrecinctDetailDrawer";
+ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+ import { api } from "@/utils/api";
+ import { ReportType } from "@/types/report.type";
+-import { AreaType } from "@/types/area.type";
+ import { useSearchParams } from "react-router-dom";
+-import { MessageCircle, Loader2, Shield, MapPin, Settings2, Layers, Globe, Flame, CircleDot, Filter, X, ChevronDown } from "lucide-react";
++import { MessageCircle, Settings2, Layers, Globe, Filter, X, ChevronDown } from "lucide-react";
++import { getAllCrimeHex, type CwUnifiedCrimeHexItem, type HexSafetyIntent } from "@/utils/cw-unified-crime-hex-api";
++import { cn } from "@/lib/utils";
++import {
++  CommunityMapLayersControls,
++  HeavyMapLoadingIsland,
++  type CommunityMapPageFilters,
++  type LayerLabels,
++  type MapLayersToggleKey,
++  type NationalHexProgressState,
++} from "@/pages/live-map/map-page-map-layers";
+ 
+ const WOLF_GREEN = "#1a4f38";
+ const WHATSAPP_NUMBER = "447466684007";
+@@ -22,28 +32,68 @@ const HIDDEN_REPORT_TYPES = new Set([
+   "Sexual Offence - Rape",
+ ]);
+ const MAP_LAYERS_STORAGE_KEY = "wolf-map-layers";
++/** Bump when defaults change; one-time migration forces heavy layers off for existing users */
++const MAP_LAYERS_MIGRATION_KEY = "wolf-map-layers-heavy-defaults-v1";
+ 
+ const DEFAULT_LAYERS = {
+-  areas: true,
+   reports: true,
++  /** Off by default — national hex is a very large load */
++  cwUnifiedCrimeHexNational: false,
++  /** Off by default — user turns on when ready (large download / stream) */
+   precinctBoundaries: false,
+   precinctStations: false,
+   heatmap: false,
++  hotspots: false,
+ } as const;
+ 
++/** Labels aligned with enterprise live map */
++const LAYER_LABELS: LayerLabels = {
++  cwUnifiedCrimeHexNational: {
++    name: "Crime Risk (SA)",
++    tooltip: "Nationwide crime risk across South Africa",
++  },
++  reports: { name: "Community Incidents", tooltip: "Incidents reported by your community on Community Wolf" },
++  hotspots: {
++    name: "Adjustable clusters",
++    tooltip:
++      "Circles you can resize. Change the radius to see more or less detail—use when you want control over the view.",
++  },
++  heatmap: {
++    name: "Density overview",
++    tooltip: "Smooth view of where reports are concentrated. Quick to read, no setup—use for a fast overview.",
++  },
++  precinctBoundaries: {
++    name: "SAPS Boundaries",
++    tooltip: "South African Police Service precinct boundaries",
++  },
++  precinctStations: {
++    name: "Police stations",
++    tooltip: "SAPS station locations",
++  },
++};
++
+ function getPersistedLayers(): typeof DEFAULT_LAYERS {
+   try {
+     const raw = localStorage.getItem(MAP_LAYERS_STORAGE_KEY);
+     if (!raw) return DEFAULT_LAYERS;
+     const parsed = JSON.parse(raw) as Record<string, boolean>;
+-    return { ...DEFAULT_LAYERS, ...parsed };
++    delete parsed.cwUnifiedCrimeHex;
++    delete parsed.communityPoi;
++    delete parsed.areas;
++    const merged = { ...DEFAULT_LAYERS, ...parsed };
++    // One-time: SAPS boundaries + Crime Risk (SA) start off until user enables (heavy loads)
++    if (!localStorage.getItem(MAP_LAYERS_MIGRATION_KEY)) {
++      merged.precinctBoundaries = false;
++      merged.cwUnifiedCrimeHexNational = false;
++      localStorage.setItem(MAP_LAYERS_MIGRATION_KEY, "1");
++      localStorage.setItem(MAP_LAYERS_STORAGE_KEY, JSON.stringify(merged));
++    }
++    return merged;
+   } catch {
+     return DEFAULT_LAYERS;
+   }
+ }
+-const WEBSITE_URL = "https://communitywolf.com";
+ import { Button } from "@/components/ui/button";
+-import { Switch } from "@/components/ui/switch";
+ import { getReportMarkerStyle } from "@/utils/map-marker-icons";
+ import {
+   fetchPrecincts as fetchPrecinctsApi,
+@@ -57,6 +107,10 @@ import {
+   PopoverTrigger,
+ } from "@/components/ui/popover";
+ 
++const WEBSITE_URL = "https://communitywolf.com";
++/** Live map report/area API — must be `community` so wolf-server applies community coverage rules */
++const REPORT_AREA_PRODUCT_TYPE = "community" as const;
++
+ function formatTypeName(type: string): string {
+   return type
+     .replaceAll("_", " ")
+@@ -175,36 +229,30 @@ export default function MapPage() {
+   const [reportsCount, setReportsCount] = useState(0);
+   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
+   const [loadingReportId, setLoadingReportId] = useState<string | null>(null);
+-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
+   const [selectedPrecinct, setSelectedPrecinct] = useState<string | null>(null);
+   const [precinctDrawerHeight, setPrecinctDrawerHeight] = useState(0);
+-  const [areas] = useState<AreaType[]>([]);
+   const mapRef = useRef<MapRef>(null);
+   const [boundariesData, setBoundariesData] = useState<PrecinctGeoJson | null>(null);
+   const [stationsData, setStationsData] = useState<PrecinctGeoJson | null>(null);
+   const [precinctLoading, setPrecinctLoading] = useState(false);
+   const [precinctProgress, setPrecinctProgress] = useState<PrecinctStreamProgress | null>(null);
+   const [markerTypes, setMarkerTypes] = useState<string[]>([]);
+-  const [mapFilters, setMapFilters] = useState<{
+-    layers: {
+-      areas: boolean;
+-      reports: boolean;
+-      precinctBoundaries: boolean;
+-      precinctStations: boolean;
+-      heatmap: boolean;
+-    };
+-    filters: {
+-      areas: string[];
+-      excludedTypes: string[];
+-    };
+-  }>(() => ({
++  const [mapFilters, setMapFilters] = useState<CommunityMapPageFilters>(() => ({
+     layers: getPersistedLayers(),
+     filters: {
+-      areas: [],
+       excludedTypes: [],
+     },
+   }));
+ 
++  const [hotspotRadiusMeters, setHotspotRadiusMeters] = useState(80);
++  const [nationalHexAllItems, setNationalHexAllItems] = useState<CwUnifiedCrimeHexItem[]>([]);
++  const [nationalHexLoading, setNationalHexLoading] = useState(false);
++  const [nationalHexStatus, setNationalHexStatus] = useState("");
++  const [nationalHexProgress, setNationalHexProgress] = useState<NationalHexProgressState | null>(null);
++  const nationalHexFetchDoneRef = useRef(false);
++  const [selectedCrimeHexH3Index, setSelectedCrimeHexH3Index] = useState<string | null>(null);
++  const [safetyIntent, setSafetyIntent] = useState<HexSafetyIntent>("travel");
++
+   useEffect(() => {
+     localStorage.setItem(MAP_LAYERS_STORAGE_KEY, JSON.stringify(mapFilters.layers));
+   }, [mapFilters.layers]);
+@@ -225,6 +273,56 @@ export default function MapPage() {
+     setMapFilters((prev) => ({ ...prev, filters: { ...prev.filters, excludedTypes: [...markerTypes] } }));
+   }, [markerTypes]);
+ 
++  useEffect(() => {
++    if (!mapFilters.layers.cwUnifiedCrimeHexNational) {
++      nationalHexFetchDoneRef.current = false;
++      return;
++    }
++    if (nationalHexFetchDoneRef.current) return;
++    let cancelled = false;
++    setNationalHexLoading(true);
++    setNationalHexStatus("Checking local cache…");
++    setNationalHexProgress({ loaded: 0, total: null, onMap: 0 });
++    getAllCrimeHex(
++      undefined,
++      (_pct, statusText) => {
++        if (!cancelled && statusText) setNationalHexStatus(statusText);
++      },
++      (batch, total) => {
++        if (!cancelled) {
++          setNationalHexProgress({ loaded: batch.length, total, onMap: 0 });
++          setNationalHexAllItems(batch);
++        }
++      }
++    )
++      .then((items) => {
++        if (cancelled) return;
++        nationalHexFetchDoneRef.current = true;
++        setNationalHexAllItems(items);
++        setNationalHexProgress({
++          loaded: items.length,
++          total: items.length,
++          onMap: items.length,
++        });
++      })
++      .catch((err) => {
++        if (!cancelled) {
++          console.error("[live-map] National crime hex load failed", err);
++          setNationalHexAllItems([]);
++        }
++      })
++      .finally(() => {
++        if (!cancelled) {
++          setNationalHexLoading(false);
++          setNationalHexStatus("");
++          setNationalHexProgress(null);
++        }
++      });
++    return () => {
++      cancelled = true;
++    };
++  }, [mapFilters.layers.cwUnifiedCrimeHexNational]);
++
+   // Move sidebarCollapsed to a ref to avoid re-renders
+   const sidebarCollapsedRef = useRef(false);
+   useEffect(() => {
+@@ -249,6 +347,14 @@ export default function MapPage() {
+     fetchSelectedReport();
+   }, [searchParams]);
+ 
++  /** Fly map to incident when user opens it from the sidebar (enterprise parity). */
++  useEffect(() => {
++    if (!selectedReport?.coordinates?.coordinates || !mapRef.current) return;
++    const [lng, lat] = selectedReport.coordinates.coordinates;
++    if (typeof lng !== "number" || typeof lat !== "number") return;
++    mapRef.current.flyTo(lat, lng, 16);
++  }, [selectedReport]);
++
+   async function fetchReport(reportId: string) {
+     const report = await api.get<ReportType>(`/report/${reportId}`);
+ 
+@@ -263,7 +369,7 @@ export default function MapPage() {
+         reportCount: number;
+       }>(`/report/area`, {
+         query: {
+-          productType: "enterprise",
++          productType: REPORT_AREA_PRODUCT_TYPE,
+           lat: viewport.center.lat.toString(),
+           lng: viewport.center.lng.toString(),
+           radius: viewport.radius.toString(),
+@@ -271,7 +377,6 @@ export default function MapPage() {
+           page: "1",
+         },
+       });
+-      setViewport(viewport);
+       setPage(1);
+       setAreaReports(reports ?? []);
+       setReportsCount(reportCount);
+@@ -282,9 +387,8 @@ export default function MapPage() {
+ 
+   // Create a debounced version of fetchAreaReports
+   const debouncedFetchAreaReports = useCallback((viewport: Viewport) => {
+-    // Check ref instead of state
++    setViewport(viewport);
+     if (sidebarCollapsedRef.current) return;
+-
+     fetchAreaReports(viewport);
+   }, []);
+ 
+@@ -301,7 +405,7 @@ export default function MapPage() {
+         reportCount: number;
+       }>(`/report/area`, {
+         query: {
+-          productType: "enterprise",
++          productType: REPORT_AREA_PRODUCT_TYPE,
+           lat: viewport.center.lat.toString(),
+           lng: viewport.center.lng.toString(),
+           radius: viewport.radius.toString(),
+@@ -401,8 +505,11 @@ export default function MapPage() {
+       setBoundariesData(fc);
+       setPrecinctProgress(progress);
+       setPrecinctLoading(false);
+-    }).catch(() => {
+-      if (!cancelled) setPrecinctLoading(false);
++    }).catch((err) => {
++      if (!cancelled) {
++        console.error("[live-map] Precinct boundaries load failed", err);
++        setPrecinctLoading(false);
++      }
+     }).finally(() => {
+       if (!cancelled) { setPrecinctLoading(false); setPrecinctProgress(null); }
+     });
+@@ -415,10 +522,40 @@ export default function MapPage() {
+     let cancelled = false;
+     fetchPrecinctsApi("points", (fc) => {
+       if (!cancelled) setStationsData(fc);
+-    }).catch(() => {});
++    }).catch((err) => {
++      console.error("[live-map] Precinct stations load failed", err);
++    });
+     return () => { cancelled = true; };
+   }, [mapFilters.layers.precinctStations]); // eslint-disable-line react-hooks/exhaustive-deps
+ 
++  /** While Crime Risk (SA) or SAPS boundaries are loading, lock other layer toggles */
++  const heavyMapLoadActive = nationalHexLoading || precinctLoading;
++  const isLayerLocked = useCallback(
++    (key: MapLayersToggleKey) => {
++      if (!nationalHexLoading && !precinctLoading) return false;
++      if (nationalHexLoading && key === "cwUnifiedCrimeHexNational") return false;
++      if (precinctLoading && key === "precinctBoundaries") return false;
++      return true;
++    },
++    [nationalHexLoading, precinctLoading]
++  );
++
++  const mapLayersControls = (
++    <CommunityMapLayersControls
++      layerLabels={LAYER_LABELS}
++      mapFilters={mapFilters}
++      setMapFilters={setMapFilters}
++      isLayerLocked={isLayerLocked}
++      nationalHexLoading={nationalHexLoading}
++      nationalHexStatus={nationalHexStatus}
++      precinctLoading={precinctLoading}
++      hotspotRadiusMeters={hotspotRadiusMeters}
++      setHotspotRadiusMeters={setHotspotRadiusMeters}
++      safetyIntent={safetyIntent}
++      setSafetyIntent={setSafetyIntent}
++    />
++  );
++
+   const mapSidebarSection = isMobile ? undefined : (
+     <div className="flex flex-col gap-3">
+       {/* <div className="bg-muted/50 rounded-md p-2 px-3">
+@@ -433,70 +570,20 @@ export default function MapPage() {
+           <Layers className="w-4 h-4 text-[#1a4f38]" />
+           <span className="text-sm font-medium">Map Layers</span>
+         </div>
+-        <div className="flex flex-col gap-2">
+-          <label className="flex items-center justify-between gap-3 cursor-pointer">
+-            <div className="flex items-center gap-2">
+-              <CircleDot className="w-3.5 h-3.5 text-muted-foreground" />
+-              <span className="text-xs">Reports</span>
+-            </div>
+-            <Switch
+-              checked={mapFilters.layers.reports}
+-              onCheckedChange={(checked) =>
+-                setMapFilters((prev) => ({
+-                  ...prev,
+-                  layers: { ...prev.layers, reports: checked },
+-                }))
+-              }
+-            />
+-          </label>
+-          <label className="flex items-center justify-between gap-3 cursor-pointer">
+-            <div className="flex items-center gap-2">
+-              <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+-              <span className="text-xs">Boundaries</span>
+-            </div>
+-            <Switch
+-              checked={mapFilters.layers.precinctBoundaries}
+-              onCheckedChange={(checked) =>
+-                setMapFilters((prev) => ({
+-                  ...prev,
+-                  layers: { ...prev.layers, precinctBoundaries: checked },
+-                }))
+-              }
+-            />
+-          </label>
+-          <label className="flex items-center justify-between gap-3 cursor-pointer">
+-            <div className="flex items-center gap-2">
+-              <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+-              <span className="text-xs">Stations</span>
+-            </div>
+-            <Switch
+-              checked={mapFilters.layers.precinctStations}
+-              onCheckedChange={(checked) =>
+-                setMapFilters((prev) => ({
+-                  ...prev,
+-                  layers: { ...prev.layers, precinctStations: checked },
+-                }))
+-              }
+-            />
+-          </label>
+-          <label className="flex items-center justify-between gap-3 cursor-pointer">
+-            <div className="flex items-center gap-2">
+-              <Flame className="w-3.5 h-3.5 text-muted-foreground" />
+-              <span className="text-xs">Heatmap</span>
+-            </div>
+-            <Switch
+-              checked={mapFilters.layers.heatmap}
+-              onCheckedChange={(checked) =>
+-                setMapFilters((prev) => ({
+-                  ...prev,
+-                  layers: { ...prev.layers, heatmap: checked },
+-                }))
+-              }
+-            />
+-          </label>
+-        </div>
++        {heavyMapLoadActive && (
++          <p className="text-[10px] text-muted-foreground mb-2 rounded-md bg-muted/50 px-2 py-1.5 border border-border/60">
++            Loading a heavy layer — other toggles are locked until it finishes. Turn that layer off to cancel.
++          </p>
++        )}
++        {mapLayersControls}
++
+         {markerTypes.length > 0 && (
+-          <div className="border-t mt-2 pt-2">
++          <div
++            className={cn(
++              "border-t mt-2 pt-2 transition-opacity",
++              heavyMapLoadActive && "pointer-events-none opacity-40"
++            )}
++          >
+             <CrimeTypeFilter
+               types={markerTypes}
+               excludedTypes={mapFilters.filters.excludedTypes}
+@@ -529,17 +616,26 @@ export default function MapPage() {
+           <div className="flex-1 min-h-0 min-w-0 relative">
+           <LiveMap
+             mapFilters={mapFilters}
+-            areas={areas}
+-            selectedAreaId={selectedArea}
+-            setSelectedAreaId={setSelectedArea}
+             onViewportChange={debouncedFetchAreaReports}
+             selectedReport={selectedReport}
+             setSelectedReport={onSelectMarker}
+             onPrecinctSelect={setSelectedPrecinct}
+             precinctData={precinctData}
+             onMarkerTypesChange={setMarkerTypes}
++            nationalHexAllItems={nationalHexAllItems}
++            safetyIntent={safetyIntent}
++            hotspotRadiusMeters={hotspotRadiusMeters}
++            onCrimeHexSelect={setSelectedCrimeHexH3Index}
+             ref={mapRef}
+           />
++          <CrimeHexDrawer
++            h3Index={selectedCrimeHexH3Index}
++            hexData={nationalHexAllItems}
++            open={selectedCrimeHexH3Index != null}
++            onOpenChange={(open) => {
++              if (!open) setSelectedCrimeHexH3Index(null);
++            }}
++          />
+           <PrecinctDetailDrawer
+             stationName={selectedPrecinct}
+             onClose={() => setSelectedPrecinct(null)}
+@@ -547,7 +643,7 @@ export default function MapPage() {
+           />
+           </div>
+           <ReportsSidebar
+-            areaFilters={mapFilters.filters.areas}
++            areaFilters={[]}
+             reports={sidebarReports}
+             reportCount={reportsCount}
+             onCollapsedChange={setSidebarCollapsed}
+@@ -572,58 +668,14 @@ export default function MapPage() {
+                     )}
+                   </Button>
+                 </PopoverTrigger>
+-                <PopoverContent align="center" side="top" className="w-64 p-3 z-[51] max-h-[70vh] overflow-y-auto">
++                <PopoverContent align="center" side="top" className="w-80 max-w-[min(22rem,90vw)] p-3 z-[51] max-h-[70vh] overflow-y-auto">
+                   <div className="text-sm font-medium mb-2">Map Layers</div>
+-                  <div className="flex flex-col gap-2">
+-                    <label className="flex items-center justify-between gap-3 cursor-pointer">
+-                      <div className="flex items-center gap-2">
+-                        <CircleDot className="w-3.5 h-3.5 text-muted-foreground" />
+-                        <span className="text-xs">Reports</span>
+-                      </div>
+-                      <Switch
+-                        checked={mapFilters.layers.reports}
+-                        onCheckedChange={(checked) =>
+-                          setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, reports: checked } }))
+-                        }
+-                      />
+-                    </label>
+-                    <label className="flex items-center justify-between gap-3 cursor-pointer">
+-                      <div className="flex items-center gap-2">
+-                        <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+-                        <span className="text-xs">Boundaries</span>
+-                      </div>
+-                      <Switch
+-                        checked={mapFilters.layers.precinctBoundaries}
+-                        onCheckedChange={(checked) =>
+-                          setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, precinctBoundaries: checked } }))
+-                        }
+-                      />
+-                    </label>
+-                    <label className="flex items-center justify-between gap-3 cursor-pointer">
+-                      <div className="flex items-center gap-2">
+-                        <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+-                        <span className="text-xs">Stations</span>
+-                      </div>
+-                      <Switch
+-                        checked={mapFilters.layers.precinctStations}
+-                        onCheckedChange={(checked) =>
+-                          setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, precinctStations: checked } }))
+-                        }
+-                      />
+-                    </label>
+-                    <label className="flex items-center justify-between gap-3 cursor-pointer">
+-                      <div className="flex items-center gap-2">
+-                        <Flame className="w-3.5 h-3.5 text-muted-foreground" />
+-                        <span className="text-xs">Heatmap</span>
+-                      </div>
+-                      <Switch
+-                        checked={mapFilters.layers.heatmap}
+-                        onCheckedChange={(checked) =>
+-                          setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, heatmap: checked } }))
+-                        }
+-                      />
+-                    </label>
+-                  </div>
++                  {heavyMapLoadActive && (
++                    <p className="text-[10px] text-muted-foreground mb-2 rounded-md bg-muted/50 px-2 py-1.5 border border-border/60">
++                      Heavy layer loading — other toggles locked until done.
++                    </p>
++                  )}
++                  {mapLayersControls}
+                   {markerTypes.length > 0 && (
+                     <div className="border-t mt-2 pt-2">
+                       <CrimeTypeFilter
+@@ -672,54 +724,14 @@ export default function MapPage() {
+               </a>
+             </Button>
+           </div>
+-          {precinctLoading && !precinctData && (
+-            <div className="absolute inset-0 z-[1999] flex items-center justify-center bg-background/50 backdrop-blur-[2px] pointer-events-none">
+-              <div className="flex flex-col items-center gap-3 rounded-2xl bg-background/95 shadow-xl ring-1 ring-border/60 px-8 py-6">
+-                <Loader2 className="h-8 w-8 animate-spin text-[#1a4f38]" strokeWidth={2} />
+-                <span className="text-sm font-medium text-foreground">Loading precincts…</span>
+-                {precinctProgress?.total ? (
+-                  <div className="w-40 h-1.5 rounded-full bg-muted overflow-hidden">
+-                    <div
+-                      className="h-full rounded-full bg-[#1a4f38] transition-all duration-300"
+-                      style={{ width: `${Math.min(100, (precinctProgress.loaded / precinctProgress.total) * 100)}%` }}
+-                    />
+-                  </div>
+-                ) : (
+-                  <div className="w-40 h-1.5 rounded-full bg-muted overflow-hidden">
+-                    <div className="h-full w-1/3 rounded-full bg-[#1a4f38]/50 animate-pulse" />
+-                  </div>
+-                )}
+-                {precinctProgress && (
+-                  <span className="text-xs text-muted-foreground">
+-                    {precinctProgress.total
+-                      ? `${precinctProgress.loaded} / ${precinctProgress.total} precincts`
+-                      : `${precinctProgress.loaded} precincts loaded`}
+-                  </span>
+-                )}
+-              </div>
+-            </div>
+-          )}
+-
+-          {precinctData && precinctProgress ? (
+-            <div className="absolute top-5 left-1/2 -translate-x-1/2 pointer-events-none z-[30]">
+-              <div className="flex items-center gap-2.5 rounded-full bg-background/95 shadow-lg ring-1 ring-border/60 px-4 py-2">
+-                <Loader2 className="h-4 w-4 animate-spin text-[#1a4f38] shrink-0" strokeWidth={2.5} />
+-                <span className="text-xs font-medium text-foreground whitespace-nowrap">
+-                  {precinctProgress.total
+-                    ? `Loading precincts ${precinctProgress.loaded} / ${precinctProgress.total}`
+-                    : `Loading precincts… ${precinctProgress.loaded}`}
+-                </span>
+-                {precinctProgress.total ? (
+-                  <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+-                    <div
+-                      className="h-full rounded-full bg-[#1a4f38] transition-all duration-300"
+-                      style={{ width: `${Math.min(100, (precinctProgress.loaded / precinctProgress.total) * 100)}%` }}
+-                    />
+-                  </div>
+-                ) : null}
+-              </div>
+-            </div>
+-          ) : null}
++
++          <HeavyMapLoadingIsland
++            nationalHexLoading={nationalHexLoading}
++            precinctLoading={precinctLoading}
++            nationalHexStatus={nationalHexStatus}
++            nationalHexProgress={nationalHexProgress}
++            precinctProgress={precinctProgress}
++          />
+         </main>
+       </div>
+     </ThemeProvider>
+diff --git a/src/pages/live-map/SafetyIntentSelector.tsx b/src/pages/live-map/SafetyIntentSelector.tsx
+new file mode 100644
+index 0000000..8e338a3
+--- /dev/null
++++ b/src/pages/live-map/SafetyIntentSelector.tsx
+@@ -0,0 +1,184 @@
++/**
++ * Horizontal pill/chip selector for safety intents — ported from enterprise.
++ */
++
++import { cn } from "@/lib/utils";
++import type { LucideIcon } from "lucide-react";
++import {
++  Car,
++  Home,
++  Moon,
++  Briefcase,
++  Palmtree,
++  Footprints,
++  TrendingUp,
++  Shield,
++  EyeOff,
++} from "lucide-react";
++import type { HexSafetyIntent } from "@/utils/cw-unified-crime-hex-api";
++
++export type HexIntentOrNone = HexSafetyIntent | "none";
++
++interface IntentOption {
++  intent: HexIntentOrNone;
++  label: string;
++  shortLabel: string;
++  icon: LucideIcon;
++  description: string;
++  focusAreas: string;
++  color: string;
++}
++
++const INTENT_OPTIONS: readonly IntentOption[] = [
++  {
++    intent: "none",
++    label: "None",
++    shortLabel: "None",
++    icon: EyeOff,
++    description: "No safety overlay — hex layer hidden.",
++    focusAreas: "",
++    color: "#6b7280",
++  },
++  {
++    intent: "overall",
++    label: "Overall",
++    shortLabel: "Overall",
++    icon: Shield,
++    description: "Balanced view — all 31 SAPS crime types weighted equally by severity.",
++    focusAreas: "Violent · Sexual · Property · Vehicle · Robbery · Drug · Commercial",
++    color: "#1a4f38",
++  },
++  {
++    intent: "travel",
++    label: "Travel / Transit",
++    shortLabel: "Travel",
++    icon: Car,
++    description: "Safe to drive through? Prioritises carjacking, vehicle hijacking and road-crime types.",
++    focusAreas: "Vehicle ×15 · Robbery ×8 · Violent ×4",
++    color: "#2563eb",
++  },
++  {
++    intent: "live",
++    label: "Live / Relocate",
++    shortLabel: "Live",
++    icon: Home,
++    description: "Safe to live here? Prioritises residential burglary, property crime and home robbery.",
++    focusAreas: "Property ×15 · Robbery ×14 · Violent ×12 · Sexual ×10",
++    color: "#16a34a",
++  },
++  {
++    intent: "sleep",
++    label: "Sleep / Night",
++    shortLabel: "Night",
++    icon: Moon,
++    description: "Safe at night? Prioritises rape, sexual assault, murder and late-night robbery.",
++    focusAreas: "Sexual ×15 · Violent ×15 · Robbery ×12 · Property ×6",
++    color: "#7c3aed",
++  },
++  {
++    intent: "business",
++    label: "Start a Business",
++    shortLabel: "Business",
++    icon: Briefcase,
++    description: "Safe for business? Prioritises commercial crime, non-residential robbery and shoplifting.",
++    focusAreas: "Commercial ×15 · Robbery ×15 · Property ×12 · Vehicle ×4",
++    color: "#d97706",
++  },
++  {
++    intent: "holiday",
++    label: "Holiday / Tourism",
++    shortLabel: "Holiday",
++    icon: Palmtree,
++    description: "Safe to visit? Prioritises street robbery, vehicle theft and tourist-targeted crime.",
++    focusAreas: "Robbery ×15 · Property ×13 · Vehicle ×11 · Sexual ×10 · Violent ×5",
++    color: "#0891b2",
++  },
++  {
++    intent: "walk",
++    label: "Walk / Commute",
++    shortLabel: "Walk",
++    icon: Footprints,
++    description: "Safe to walk? Prioritises street robbery, assault, sexual crime and drug zones.",
++    focusAreas: "Robbery ×15 · Violent ×14 · Sexual ×12 · Drug ×4",
++    color: "#be185d",
++  },
++  {
++    intent: "invest",
++    label: "Invest / Buy Property",
++    shortLabel: "Invest",
++    icon: TrendingUp,
++    description: "Property value protected? Prioritises residential burglary, arson, vandalism and murder trends.",
++    focusAreas: "Property ×12 · Violent ×12 · Drug ×8 · Vehicle ×7 · Robbery ×6",
++    color: "#92400e",
++  },
++] as const;
++
++export function SafetyIntentSelector({
++  value,
++  onChange,
++  compact = false,
++  disabled = false,
++}: Readonly<{
++  value: HexIntentOrNone;
++  onChange: (intent: HexIntentOrNone) => void;
++  compact?: boolean;
++  disabled?: boolean;
++}>) {
++  const activeOption = INTENT_OPTIONS.find((o) => o.intent === value);
++
++  return (
++    <div className="space-y-1.5">
++      {!compact && (
++        <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground px-0.5">
++          Safety overlay
++        </p>
++      )}
++      <div className="flex flex-wrap gap-1">
++        {INTENT_OPTIONS.map((opt) => {
++          const Icon = opt.icon;
++          const isActive = value === opt.intent;
++          return (
++            <button
++              key={opt.intent}
++              type="button"
++              onClick={() => onChange(opt.intent)}
++              title={opt.description}
++              disabled={disabled}
++              className={cn(
++                "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium transition-all",
++                disabled && "cursor-not-allowed opacity-50",
++                isActive
++                  ? "border-transparent shadow-sm"
++                  : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/30",
++              )}
++              style={
++                isActive
++                  ? {
++                      backgroundColor: `${opt.color}18`,
++                      color: opt.color,
++                      borderColor: `${opt.color}50`,
++                    }
++                  : undefined
++              }
++            >
++              <Icon size={12} className="shrink-0" />
++              {compact ? opt.shortLabel : opt.label}
++            </button>
++          );
++        })}
++      </div>
++      {!compact && activeOption && activeOption.intent !== "none" && (
++        <div className="space-y-0.5 px-0.5">
++          <p className="text-[10px] text-muted-foreground">
++            {activeOption.description}
++          </p>
++          {activeOption.intent !== "overall" && activeOption.focusAreas && (
++            <p className="text-[9px] font-mono text-muted-foreground/70">
++              {activeOption.focusAreas}
++            </p>
++          )}
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/src/pages/live-map/map-layer-adders.ts b/src/pages/live-map/map-layer-adders.ts
+new file mode 100644
+index 0000000..53ce99c
+--- /dev/null
++++ b/src/pages/live-map/map-layer-adders.ts
+@@ -0,0 +1,118 @@
++/**
++ * Mapbox layer helpers — z-order aligned with enterprise live map.
++ */
++import type mapboxgl from "mapbox-gl";
++
++export const CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID = "cw-unified-crime-hex-national";
++export const CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID = "cw-unified-crime-hex-national-fill";
++export const CW_UNIFIED_CRIME_HEX_NATIONAL_OUTLINE_LAYER_ID = "cw-unified-crime-hex-national-outline";
++
++const MARKER_ANCHOR_ID = "markers";
++
++export function addNationalCrimeHexSourceAndLayer(map: mapboxgl.Map): void {
++  if (map.getSource(CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID)) return;
++  map.addSource(CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID, {
++    type: "geojson",
++    data: { type: "FeatureCollection", features: [] },
++    promoteId: "h3Index",
++  });
++  map.addLayer(
++    {
++      id: CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID,
++      type: "fill",
++      source: CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID,
++      layout: { visibility: "none" },
++      paint: {
++        "fill-color": ["get", "fillColor"],
++        "fill-opacity": 0.55,
++        "fill-outline-color": "transparent",
++      },
++    },
++    MARKER_ANCHOR_ID
++  );
++  map.addLayer(
++    {
++      id: CW_UNIFIED_CRIME_HEX_NATIONAL_OUTLINE_LAYER_ID,
++      type: "line",
++      source: CW_UNIFIED_CRIME_HEX_NATIONAL_SOURCE_ID,
++      layout: { visibility: "none" },
++      paint: {
++        "line-color": ["case", ["==", ["get", "hasReports"], 1], "#ef4444", "rgba(80,80,80,0.15)"],
++        "line-width": ["case", ["==", ["get", "hasReports"], 1], 2, 0.3],
++      },
++    },
++    CW_UNIFIED_CRIME_HEX_NATIONAL_LAYER_ID
++  );
++}
++
++export function addPoiMarkersSourceAndLayers(map: mapboxgl.Map): void {
++  if (map.getSource("poi-markers")) return;
++  map.addSource("poi-markers", {
++    type: "geojson",
++    data: { type: "FeatureCollection", features: [] },
++  });
++  map.addLayer({
++    id: "poi-markers-osm",
++    type: "symbol",
++    source: "poi-markers",
++    filter: ["==", ["get", "source"], "osm"],
++    layout: {
++      "icon-image": ["coalesce", ["get", "iconId"], ["literal", "map-icon-poi-default-3b82f6"]],
++      "icon-size": [
++        "case",
++        ["==", ["get", "isSelected"], true],
++        1.25,
++        ["case", ["==", ["get", "isLoading"], true], 1.5, 0.6],
++      ],
++      "icon-allow-overlap": true,
++      "icon-ignore-placement": true,
++      "icon-anchor": "bottom",
++    },
++  });
++}
++
++const notTypeFiltered = ["!", ["get", "isTypeFiltered"]] as ["!", unknown[]];
++
++export function addReportHeatmapAndHotspotLayers(map: mapboxgl.Map): void {
++  map.addLayer({
++    id: "report-hotspots",
++    type: "circle",
++    source: "markers",
++    layout: { visibility: "none" },
++    filter: ["all", ["!", ["get", "isFiltered"]], notTypeFiltered],
++    paint: {
++      "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 80, 12, 200, 16, 400],
++      "circle-opacity": 0.12,
++      "circle-color": "#ef4444",
++    },
++  });
++  map.addLayer({
++    id: "report-heatmap",
++    type: "heatmap",
++    source: "markers",
++    maxzoom: 16,
++    layout: { visibility: "none" },
++    filter: ["all", ["!", ["get", "isFiltered"]], notTypeFiltered],
++    paint: {
++      "heatmap-weight": 1,
++      "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 2, 16, 1.5],
++      "heatmap-color": [
++        "interpolate",
++        ["linear"],
++        ["heatmap-density"],
++        0,
++        "rgba(0,0,0,0)",
++        0.2,
++        "rgba(239,68,68,0.4)",
++        0.4,
++        "rgba(249,115,22,0.6)",
++        0.6,
++        "rgba(234,179,8,0.7)",
++        1,
++        "rgba(220,38,38,0.85)",
++      ],
++      "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, 15, 10, 25, 14, 50],
++      "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 14, 0.5, 18, 0.2],
++    },
++  });
++}
+diff --git a/src/pages/live-map/map-page-map-layer-utils.ts b/src/pages/live-map/map-page-map-layer-utils.ts
+new file mode 100644
+index 0000000..b69db1f
+--- /dev/null
++++ b/src/pages/live-map/map-page-map-layer-utils.ts
+@@ -0,0 +1,55 @@
++/**
++ * Types + pure helpers for live map layer UI (kept separate from components for Sonar / fast-refresh).
++ */
++import type { PrecinctStreamProgress } from "@/utils/police-precincts-api";
++
++export type LayerLabels = {
++  cwUnifiedCrimeHexNational: { name: string; tooltip: string };
++  precinctBoundaries: { name: string; tooltip: string };
++  reports: { name: string; tooltip: string };
++  hotspots: { name: string; tooltip: string };
++  heatmap: { name: string; tooltip: string };
++  precinctStations: { name: string; tooltip: string };
++};
++
++/** Mirrors MapPage `mapFilters` state shape */
++export type CommunityMapPageFilters = {
++  layers: {
++    cwUnifiedCrimeHexNational: boolean;
++    reports: boolean;
++    precinctBoundaries: boolean;
++    precinctStations: boolean;
++    heatmap: boolean;
++    hotspots: boolean;
++  };
++  filters: {
++    excludedTypes: string[];
++  };
++};
++
++export type MapLayersToggleKey = keyof CommunityMapPageFilters["layers"];
++
++export function getHeavyLayerLoadingLabel(
++  nationalHexLoading: boolean,
++  nationalHexStatus: string,
++  precinctLoading: boolean,
++): string {
++  if (nationalHexLoading) return nationalHexStatus || "Loading Crime Risk (SA)…";
++  if (precinctLoading) return "Loading SAPS boundaries…";
++  return "Loading map data…";
++}
++
++export function getHeavyLoadIslandTitle(
++  nationalHexLoading: boolean,
++  precinctLoading: boolean,
++): string {
++  if (nationalHexLoading) return "Loading Crime Risk (SA)";
++  if (precinctLoading) return "Loading SAPS boundaries";
++  return "";
++}
++
++export function getPrecinctProgressLabel(progress: PrecinctStreamProgress | null): string | null {
++  if (!progress) return null;
++  if (progress.total) return `${progress.loaded} / ${progress.total} precincts`;
++  return `${progress.loaded} precincts`;
++}
+diff --git a/src/pages/live-map/map-page-map-layers.tsx b/src/pages/live-map/map-page-map-layers.tsx
+new file mode 100644
+index 0000000..bfc12c2
+--- /dev/null
++++ b/src/pages/live-map/map-page-map-layers.tsx
+@@ -0,0 +1,318 @@
++/**
++ * Map layer UI chunks extracted from MapPage for Sonar (cognitive complexity / nested ternary).
++ */
++import { type Dispatch, type ReactNode, type SetStateAction } from "react";
++import {
++  Layers,
++  Shield,
++  FileText,
++  CircleDot,
++  Flame,
++  Map as MapIconLucide,
++  Loader2,
++} from "lucide-react";
++import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
++import { Label } from "@/components/ui/label";
++import { Slider } from "@/components/ui/slider";
++import { Input } from "@/components/ui/input";
++import { cn } from "@/lib/utils";
++import { Switch } from "@/components/ui/switch";
++import type { PrecinctStreamProgress } from "@/utils/police-precincts-api";
++import type { HexSafetyIntent } from "@/utils/cw-unified-crime-hex-api";
++import { SafetyIntentSelector, type HexIntentOrNone } from "@/pages/live-map/SafetyIntentSelector";
++import {
++  getHeavyLayerLoadingLabel,
++  getHeavyLoadIslandTitle,
++  getPrecinctProgressLabel,
++  type CommunityMapPageFilters,
++  type LayerLabels,
++  type MapLayersToggleKey,
++} from "@/pages/live-map/map-page-map-layer-utils";
++
++export type { CommunityMapPageFilters, LayerLabels, MapLayersToggleKey } from "@/pages/live-map/map-page-map-layer-utils";
++
++const HOTSPOT_RADIUS_MIN = 20;
++const HOTSPOT_RADIUS_MAX = 2000;
++
++export type NationalHexProgressState = Readonly<{
++  loaded: number;
++  total: number | null;
++  onMap?: number;
++}>;
++
++function nationalHexBarWidthPct(loaded: number, total: number | null): string {
++  if (typeof total !== "number" || total <= 0) return "0%";
++  return `${Math.min(100, (loaded / total) * 100)}%`;
++}
++
++function NationalHexLoadingProgressBlock({ prog }: Readonly<{ prog: NationalHexProgressState }>) {
++  return (
++    <div className="space-y-1">
++      <p className="text-xs text-muted-foreground">
++        {prog.loaded.toLocaleString()}
++        {typeof prog.total === "number" ? ` / ${prog.total.toLocaleString()}` : ""}
++        {" · "}
++        {prog.onMap?.toLocaleString() ?? "0"} on map
++      </p>
++      <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
++        <div
++          className="h-full rounded-full bg-amber-500 transition-[width] duration-150"
++          style={{ width: nationalHexBarWidthPct(prog.loaded, prog.total) }}
++        />
++      </div>
++    </div>
++  );
++}
++
++export function MapLayerRow({
++  icon,
++  label,
++  tooltip,
++  checked,
++  onCheckedChange,
++  disabled,
++}: Readonly<{
++  icon: ReactNode;
++  label: string;
++  tooltip: string;
++  checked: boolean;
++  onCheckedChange: (v: boolean) => void;
++  disabled?: boolean;
++}>) {
++  const fullTooltip = disabled
++    ? `${tooltip} (Wait for the current map load to finish before changing other layers.)`
++    : tooltip;
++  return (
++    <Tooltip>
++      <TooltipTrigger asChild>
++        <label
++          className={cn(
++            "flex items-center justify-between gap-3",
++            disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
++          )}
++        >
++          <div className="flex items-center gap-2 min-w-0">
++            {icon}
++            <span className="text-xs truncate">{label}</span>
++          </div>
++          <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
++        </label>
++      </TooltipTrigger>
++      <TooltipContent side="left" className="max-w-[240px]">
++        {fullTooltip}
++      </TooltipContent>
++    </Tooltip>
++  );
++}
++
++export function HeavyMapLoadingIsland({
++  nationalHexLoading,
++  precinctLoading,
++  nationalHexStatus,
++  nationalHexProgress,
++  precinctProgress,
++}: Readonly<{
++  nationalHexLoading: boolean;
++  precinctLoading: boolean;
++  nationalHexStatus: string;
++  nationalHexProgress: NationalHexProgressState | null;
++  precinctProgress: PrecinctStreamProgress | null;
++}>) {
++  const active = nationalHexLoading || precinctLoading;
++  if (!active) return null;
++
++  const title = getHeavyLoadIslandTitle(nationalHexLoading, precinctLoading);
++  const precinctLabel = getPrecinctProgressLabel(precinctProgress);
++  const awaitingNationalHexProgress = nationalHexProgress == null;
++
++  return (
++    <div className="pointer-events-none fixed bottom-4 left-1/2 z-[2000] w-[min(92vw,24rem)] -translate-x-1/2 px-2 sm:px-0">
++      <div className="pointer-events-auto rounded-xl border bg-background/95 shadow-xl ring-1 ring-border/70 backdrop-blur-sm px-4 py-3">
++        <div className="flex gap-3">
++          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-[#1a4f38] mt-0.5" strokeWidth={2.5} />
++          <div className="min-w-0 flex-1 space-y-1.5">
++            <p className="text-sm font-semibold leading-tight text-foreground">{title}</p>
++            <p className="text-[11px] leading-snug text-muted-foreground">
++              Other map layers stay locked until this finishes. Turn this layer off in the list to cancel.
++            </p>
++            {nationalHexLoading && nationalHexProgress ? (
++              <NationalHexLoadingProgressBlock prog={nationalHexProgress} />
++            ) : null}
++            {nationalHexLoading && nationalHexStatus && awaitingNationalHexProgress ? (
++              <p className="text-[10px] text-muted-foreground truncate" title={nationalHexStatus}>
++                {nationalHexStatus}
++              </p>
++            ) : null}
++            {precinctLoading && precinctProgress?.total ? (
++              <div className="h-1.5 w-full max-w-full rounded-full bg-muted overflow-hidden">
++                <div
++                  className="h-full rounded-full bg-[#1a4f38] transition-all duration-300"
++                  style={{
++                    width: `${Math.min(100, (precinctProgress.loaded / precinctProgress.total) * 100)}%`,
++                  }}
++                />
++              </div>
++            ) : null}
++            {precinctLoading && precinctLabel ? (
++              <p className="text-[10px] text-muted-foreground">{precinctLabel}</p>
++            ) : null}
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
++
++export function CommunityMapLayersControls({
++  layerLabels,
++  mapFilters,
++  setMapFilters,
++  isLayerLocked,
++  nationalHexLoading,
++  nationalHexStatus,
++  precinctLoading,
++  hotspotRadiusMeters,
++  setHotspotRadiusMeters,
++  safetyIntent,
++  setSafetyIntent,
++}: Readonly<{
++  layerLabels: LayerLabels;
++  mapFilters: CommunityMapPageFilters;
++  setMapFilters: Dispatch<SetStateAction<CommunityMapPageFilters>>;
++  isLayerLocked: (key: MapLayersToggleKey) => boolean;
++  nationalHexLoading: boolean;
++  nationalHexStatus: string;
++  precinctLoading: boolean;
++  hotspotRadiusMeters: number;
++  setHotspotRadiusMeters: (v: number) => void;
++  safetyIntent: HexSafetyIntent;
++  setSafetyIntent: (intent: HexSafetyIntent) => void;
++}>) {
++  const showLoadingRow = nationalHexLoading || precinctLoading;
++  const loadingLabel = getHeavyLayerLoadingLabel(
++    nationalHexLoading,
++    nationalHexStatus,
++    precinctLoading
++  );
++
++  return (
++    <TooltipProvider delayDuration={300}>
++      <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-0.5">
++        {showLoadingRow && (
++          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
++            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
++            {loadingLabel}
++          </div>
++        )}
++        <MapLayerRow
++          icon={<Layers className="w-3.5 h-3.5 text-muted-foreground" />}
++          label={layerLabels.cwUnifiedCrimeHexNational.name}
++          tooltip={layerLabels.cwUnifiedCrimeHexNational.tooltip}
++          checked={mapFilters.layers.cwUnifiedCrimeHexNational}
++          disabled={isLayerLocked("cwUnifiedCrimeHexNational")}
++          onCheckedChange={(checked) =>
++            setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, cwUnifiedCrimeHexNational: checked } }))
++          }
++        />
++        {mapFilters.layers.cwUnifiedCrimeHexNational && (
++          <div className="pl-3 border-l border-muted ml-1">
++            <SafetyIntentSelector
++              value={safetyIntent}
++              onChange={(v: HexIntentOrNone) => {
++                if (v === "none") {
++                  setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, cwUnifiedCrimeHexNational: false } }));
++                } else {
++                  setSafetyIntent(v);
++                }
++              }}
++              compact
++              disabled={nationalHexLoading}
++            />
++          </div>
++        )}
++        <MapLayerRow
++          icon={<Shield className="w-3.5 h-3.5 text-muted-foreground" />}
++          label={layerLabels.precinctBoundaries.name}
++          tooltip={layerLabels.precinctBoundaries.tooltip}
++          checked={mapFilters.layers.precinctBoundaries}
++          disabled={isLayerLocked("precinctBoundaries")}
++          onCheckedChange={(checked) =>
++            setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, precinctBoundaries: checked } }))
++          }
++        />
++        <MapLayerRow
++          icon={<FileText className="w-3.5 h-3.5 text-muted-foreground" />}
++          label={layerLabels.reports.name}
++          tooltip={layerLabels.reports.tooltip}
++          checked={mapFilters.layers.reports}
++          disabled={isLayerLocked("reports")}
++          onCheckedChange={(checked) =>
++            setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, reports: checked } }))
++          }
++        />
++        <MapLayerRow
++          icon={<CircleDot className="w-3.5 h-3.5 text-muted-foreground" />}
++          label={layerLabels.hotspots.name}
++          tooltip={layerLabels.hotspots.tooltip}
++          checked={mapFilters.layers.hotspots}
++          disabled={isLayerLocked("hotspots")}
++          onCheckedChange={(checked) =>
++            setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, hotspots: checked } }))
++          }
++        />
++        {mapFilters.layers.hotspots && (
++          <div className="pl-3 space-y-1 border-l border-muted ml-1">
++            <Label className="text-[10px] text-muted-foreground">Cluster radius (m)</Label>
++            <div className="flex items-center gap-2">
++              <Slider
++                value={[Math.min(HOTSPOT_RADIUS_MAX, Math.max(HOTSPOT_RADIUS_MIN, hotspotRadiusMeters))]}
++                onValueChange={([v]) =>
++                  setHotspotRadiusMeters(Math.min(HOTSPOT_RADIUS_MAX, Math.max(HOTSPOT_RADIUS_MIN, v)))
++                }
++                min={HOTSPOT_RADIUS_MIN}
++                max={HOTSPOT_RADIUS_MAX}
++                step={5}
++                disabled={isLayerLocked("hotspots")}
++                className="flex-1"
++              />
++              <Input
++                type="number"
++                min={HOTSPOT_RADIUS_MIN}
++                max={HOTSPOT_RADIUS_MAX}
++                value={hotspotRadiusMeters}
++                disabled={isLayerLocked("hotspots")}
++                onChange={(e) => {
++                  const v = Number.parseInt(e.target.value, 10);
++                  if (!Number.isNaN(v)) {
++                    setHotspotRadiusMeters(Math.min(HOTSPOT_RADIUS_MAX, Math.max(HOTSPOT_RADIUS_MIN, v)));
++                  }
++                }}
++                className="w-16 h-7 text-[10px] tabular-nums px-1"
++              />
++            </div>
++          </div>
++        )}
++        <MapLayerRow
++          icon={<Flame className="w-3.5 h-3.5 text-muted-foreground" />}
++          label={layerLabels.heatmap.name}
++          tooltip={layerLabels.heatmap.tooltip}
++          checked={mapFilters.layers.heatmap}
++          disabled={isLayerLocked("heatmap")}
++          onCheckedChange={(checked) =>
++            setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, heatmap: checked } }))
++          }
++        />
++        <MapLayerRow
++          icon={<MapIconLucide className="w-3.5 h-3.5 text-muted-foreground" />}
++          label={layerLabels.precinctStations.name}
++          tooltip={layerLabels.precinctStations.tooltip}
++          checked={mapFilters.layers.precinctStations}
++          disabled={isLayerLocked("precinctStations")}
++          onCheckedChange={(checked) =>
++            setMapFilters((prev) => ({ ...prev, layers: { ...prev.layers, precinctStations: checked } }))
++          }
++        />
++      </div>
++    </TooltipProvider>
++  );
++}
+diff --git a/src/types/poi.type.ts b/src/types/poi.type.ts
+new file mode 100644
+index 0000000..31f399d
+--- /dev/null
++++ b/src/types/poi.type.ts
+@@ -0,0 +1,24 @@
++/** Minimal POI types for community live map (wolf-server GET /:organisationId/poi). */
++
++export interface GeoJSONPoint {
++  type: "Point";
++  coordinates: [number, number];
++}
++
++export interface POIMarker {
++  _id: string;
++  name: string;
++  "category-slug": string;
++  "category-path"?: string[];
++  location: GeoJSONPoint;
++  /** "community" | "osm" — community layer removed; OSM uses this */
++  source?: "osm" | "community";
++}
++
++export interface POIListResponse {
++  pois: POIMarker[];
++  poiCount: number;
++  page: number;
++  limit: number;
++  osmError?: string;
++}
+diff --git a/src/utils/api.ts b/src/utils/api.ts
+index 3c81bad..7ac5647 100644
+--- a/src/utils/api.ts
++++ b/src/utils/api.ts
+@@ -1,4 +1,17 @@
+-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
++const ENV_API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
++
++function resolveApiUrl(): string {
++  if (!import.meta.env.DEV) return "/wolf-api";
++  if (ENV_API_URL) return ENV_API_URL.replace(/\/+$/, "");
++  return "http://localhost:4000/api";
++}
++
++const API_URL = resolveApiUrl();
++
++/** Base URL for building absolute URLs (e.g. crime hex NDJSON stream). */
++export function getBackendApiUrl(): string {
++  return API_URL;
++}
+ 
+ type HTTPMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+ 
+@@ -39,8 +52,6 @@ async function fetchWithAuth<TResponse, TRequest>(
+     url = `${url}?${params.toString()}`;
+   }
+ 
+-  // console.log("Calling " + method + " " + url);
+-
+   const headers = new Headers({
+     "Content-Type": "application/json",
+     ...options.headers,
+@@ -57,10 +68,7 @@ async function fetchWithAuth<TResponse, TRequest>(
+ 
+   const responseData = await response.json().catch(() => ({}));
+ 
+-  // console.log("Api response", responseData);
+-
+   if (!response.ok) {
+-    // console.log(responseData);
+     throw new APIError(response.status, responseData.error, responseData);
+   }
+ 
+diff --git a/src/utils/crime-hex-geojson.ts b/src/utils/crime-hex-geojson.ts
+new file mode 100644
+index 0000000..4d8d756
+--- /dev/null
++++ b/src/utils/crime-hex-geojson.ts
+@@ -0,0 +1,109 @@
++/**
++ * Crime hex → GeoJSON for map.
++ * Color palette and scoring logic matches enterprise frontend exactly.
++ */
++
++import type { CwUnifiedCrimeHexItem } from "@/utils/cw-unified-crime-hex-api";
++import { h3ToGeoJsonPolygon } from "@/utils/h3-geo";
++
++export type HexItemForGeoJson = CwUnifiedCrimeHexItem & {
++  safetyScore?: number;
++  reportRisk?: number | null;
++};
++
++const NO_DATA_HEX_COLOR = "#9ca3af";
++const VERY_LOW_HEX_COLOR = "#bbf7d0";
++const ZERO_CRIME_HEX_COLOR = "#16a34a";
++
++const VERY_LOW_RISK_THRESHOLD = 4;
++const NO_DATA_SAFETY_SCORE = -1;
++
++function hexRenderState(score: number | undefined): "nodata" | "zero" | "verylow" | "normal" {
++  if (score == null || score === NO_DATA_SAFETY_SCORE || Number.isNaN(score)) return "nodata";
++  if (score === 100) return "zero";
++  if (score >= 100 - VERY_LOW_RISK_THRESHOLD) return "verylow";
++  return "normal";
++}
++
++const SCORE_COLOR_STOPS: [number, string][] = [
++  [94, "#065f46"],
++  [87, "#047857"],
++  [80, "#059669"],
++  [73, "#10b981"],
++  [66, "#34d399"],
++  [59, "#84cc16"],
++  [52, "#a3e635"],
++  [45, "#facc15"],
++  [38, "#fbbf24"],
++  [31, "#f59e0b"],
++  [24, "#f97316"],
++  [17, "#ea580c"],
++  [10, "#dc2626"],
++  [5,  "#b91c1c"],
++  [1,  "#991b1b"],
++  [0,  "#7f1d1d"],
++];
++
++function hexToRgb(hex: string): [number, number, number] {
++  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
++  return m ? [Number.parseInt(m[1], 16), Number.parseInt(m[2], 16), Number.parseInt(m[3], 16)] : [0, 0, 0];
++}
++
++function rgbToHex(r: number, g: number, b: number): string {
++  return "#" + [r, g, b].map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join("");
++}
++
++function getScoreMapColorSmooth(score: number): string {
++  const s = Math.max(0, Math.min(100, score));
++  const visual = 100 * Math.pow(s / 100, 1.7);
++  const stops = [...SCORE_COLOR_STOPS].sort((a, b) => b[0] - a[0]);
++  for (let i = 0; i < stops.length - 1; i++) {
++    const [hi, cHi] = stops[i];
++    const [lo, cLo] = stops[i + 1];
++    if (visual <= hi && visual >= lo) {
++      const t = hi === lo ? 1 : (visual - lo) / (hi - lo);
++      const [rHi, gHi, bHi] = hexToRgb(cHi);
++      const [rLo, gLo, bLo] = hexToRgb(cLo);
++      return rgbToHex(rLo + t * (rHi - rLo), gLo + t * (gHi - gLo), bLo + t * (bHi - bLo));
++    }
++  }
++  return visual >= 95 ? stops[0][1] : stops.at(-1)?.[1] ?? "#7f1d1d";
++}
++
++export function crimeHexToGeoJson(items: HexItemForGeoJson[]): GeoJSON.FeatureCollection {
++  const features: GeoJSON.Feature<GeoJSON.Polygon>[] = [];
++  for (const item of items) {
++    const coords = h3ToGeoJsonPolygon(item.h3Index);
++    if (coords.length < 3) continue;
++    const score = item.safetyScore;
++    const state = hexRenderState(score);
++    let fillColor: string;
++    switch (state) {
++      case "nodata":
++        fillColor = NO_DATA_HEX_COLOR;
++        break;
++      case "zero":
++        fillColor = ZERO_CRIME_HEX_COLOR;
++        break;
++      case "verylow":
++        fillColor = VERY_LOW_HEX_COLOR;
++        break;
++      default:
++        fillColor = getScoreMapColorSmooth(score ?? 0);
++    }
++    features.push({
++      type: "Feature",
++      id: item.h3Index,
++      geometry: { type: "Polygon", coordinates: [coords] },
++      properties: {
++        h3Index: item.h3Index,
++        fillColor,
++        totalCount: item.totalCount,
++        reportRisk: item.reportRisk == null ? null : Math.max(0, Math.min(100, item.reportRisk)),
++        hasReports: (item.reportRisk ?? 0) > 0 ? 1 : 0,
++        noData: state === "nodata" ? 1 : 0,
++      },
++    });
++  }
++  return { type: "FeatureCollection", features };
++}
+diff --git a/src/utils/crime-hex-viewport.ts b/src/utils/crime-hex-viewport.ts
+new file mode 100644
+index 0000000..9d0d0fe
+--- /dev/null
++++ b/src/utils/crime-hex-viewport.ts
+@@ -0,0 +1,37 @@
++/**
++ * Viewport capping and bounds filter for crime hex (aligned with enterprise).
++ */
++
++import type { CwUnifiedCrimeHexItem, HexSafetyIntent } from "@/utils/cw-unified-crime-hex-api";
++
++export function capItemsForDisplay(items: CwUnifiedCrimeHexItem[], max: number): CwUnifiedCrimeHexItem[] {
++  if (items.length <= max) return items;
++  const step = items.length / max;
++  const out: CwUnifiedCrimeHexItem[] = [];
++  for (let i = 0; i < max; i++) {
++    const idx = Math.floor(i * step);
++    out.push(items[idx]);
++  }
++  return out;
++}
++
++export function filterHexItemsByMapBounds(
++  items: CwUnifiedCrimeHexItem[],
++  west: number,
++  south: number,
++  east: number,
++  north: number,
++): CwUnifiedCrimeHexItem[] {
++  return items.filter((i) => i.lng != null && i.lat != null && i.lng >= west && i.lng <= east && i.lat >= south && i.lat <= north);
++}
++
++/** Map item → display row with safetyScore for GeoJSON. Uses the selected intent's pre-computed score from Go backend. */
++export function scoreCrimeHexItemsForDisplay(
++  items: CwUnifiedCrimeHexItem[],
++  intent: HexSafetyIntent = "travel",
++): Array<CwUnifiedCrimeHexItem & { safetyScore?: number }> {
++  return items.map((i) => ({
++    ...i,
++    safetyScore: i.ss?.[intent] ?? i.ss?.overall ?? 100 - Math.min(100, i.colorIndex * 6),
++  }));
++}
+diff --git a/src/utils/cw-unified-crime-hex-api.ts b/src/utils/cw-unified-crime-hex-api.ts
+new file mode 100644
+index 0000000..c09054b
+--- /dev/null
++++ b/src/utils/cw-unified-crime-hex-api.ts
+@@ -0,0 +1,550 @@
++/**
++ * CW Crime Hex API (organisation-agnostic; kebab-case backend).
++ * Separate from hex-grid; used only for the live map crime hex layer.
++ */
++
++import { cellToLatLng } from "h3-js";
++import { api, getBackendApiUrl } from "@/utils/api";
++import { getHexCache, setHexCache } from "@/utils/hex-idb-cache";
++import { getSafetyRouterAuth, getSafetyRouterBaseUrl } from "@/utils/safety-routing-api";
++
++export type HexSafetyIntent =
++  | "overall"
++  | "travel"
++  | "walk"
++  | "live"
++  | "sleep"
++  | "business"
++  | "holiday"
++  | "invest";
++
++export interface CwUnifiedCrimeHexItem {
++  h3Index: string;
++  resolution: number;
++  totalCount: number;
++  drugCount: number;
++  violentCount: number;
++  propertyCount: number;
++  incidentTypeCounts: Record<string, number>;
++  colorIndex: number;
++  /** True when totalCount === 0 but a neighbor has crime */
++  hasCrimeNeighbor?: boolean;
++  /** Per-crime-type risk scores (0-100), keyed by 2-letter code (e.g. "MU", "CJ"). From Go backend cr field. */
++  cr?: Record<string, number>;
++  /** Per-crime-type quarter-over-quarter trend (-100..+100), keyed by 2-letter code. From Go backend ct field. */
++  ct?: Record<string, number>;
++  /** Post-average POI proximity modifier. */
++  poiModifier?: number;
++  /** Post-average OSM density modifier. */
++  osmModifier?: number;
++  /** Per-intent safety scores (0-100, pre-POI/OSM) from Go backend. Key = intent. */
++  ss?: Record<string, number>;
++  /** Hex centroid latitude (from Go backend `la` field). */
++  lat?: number;
++  /** Hex centroid longitude (from Go backend `ln` field). */
++  lng?: number;
++}
++
++export interface CwUnifiedCrimeHexDataResponse {
++  success: boolean;
++  data: CwUnifiedCrimeHexItem[];
++  minValue: number;
++  maxValue: number;
++}
++
++export interface CwUnifiedCrimeHexConfig {
++  colors: string[];
++  categoryColorIndex: Record<string, number>;
++  updatedAt?: string;
++}
++
++export interface CwUnifiedCrimeHexConfigResponse {
++  success: boolean;
++  data: CwUnifiedCrimeHexConfig | null;
++}
++
++export interface CwUnifiedCrimeHexFetchParams {
++  west: number;
++  south: number;
++  east: number;
++  north: number;
++  resolution: number;
++  crimeCategories?: ("Drug" | "Violent" | "Property")[];
++}
++
++export async function getCwUnifiedCrimeHexData(
++  params: CwUnifiedCrimeHexFetchParams,
++  token?: string
++): Promise<CwUnifiedCrimeHexDataResponse> {
++  const q = new URLSearchParams({
++    west: String(params.west),
++    south: String(params.south),
++    east: String(params.east),
++    north: String(params.north),
++    resolution: String(params.resolution),
++  });
++  if (params.crimeCategories?.length) {
++    q.set("crimeCategory", params.crimeCategories.join(","));
++  }
++  const res = await api.get<CwUnifiedCrimeHexDataResponse>(
++    `/cw-unified-crime-hex?${q.toString()}`,
++    { token }
++  );
++  return res;
++}
++
++export async function getCwUnifiedCrimeHexConfig(
++  token?: string
++): Promise<CwUnifiedCrimeHexConfigResponse> {
++  return api.get<CwUnifiedCrimeHexConfigResponse>("/cw-unified-crime-hex/config", {
++    token,
++  });
++}
++
++/** Stream viewport hex data as NDJSON for progressive rendering (250 per batch). */
++export interface CwUnifiedCrimeHexStreamProgress {
++  loaded: number;
++  total: number | null;
++}
++
++function buildStreamUrl(params: CwUnifiedCrimeHexFetchParams): string {
++  const q = new URLSearchParams({
++    west: String(params.west),
++    south: String(params.south),
++    east: String(params.east),
++    north: String(params.north),
++    resolution: String(params.resolution),
++  });
++  if (params.crimeCategories?.length) {
++    q.set("crimeCategory", params.crimeCategories.join(","));
++  }
++  const base = getBackendApiUrl().replace(/\/+$/, "");
++  return `${base}/cw-unified-crime-hex/stream?${q.toString()}`;
++}
++
++function tryParseMeta(line: string): number | null {
++  try {
++    const meta = JSON.parse(line) as { _meta?: boolean; total?: number };
++    if (meta?._meta && typeof meta.total === "number") return meta.total;
++  } catch { /* not meta */ }
++  return null;
++}
++
++function tryParseItem(line: string, resolution: number): CwUnifiedCrimeHexItem | null {
++  try {
++    const raw = JSON.parse(line) as { h3Index?: string; colorIndex?: number; totalCount?: number };
++    if (!raw?.h3Index) return null;
++    return {
++      h3Index: raw.h3Index,
++      resolution,
++      totalCount: raw.totalCount ?? 0,
++      drugCount: 0,
++      violentCount: 0,
++      propertyCount: 0,
++      incidentTypeCounts: {},
++      colorIndex: raw.colorIndex ?? 0,
++    };
++  } catch { return null; }
++}
++
++interface StreamState {
++  items: CwUnifiedCrimeHexItem[];
++  total: number | null;
++  lastFlushed: number;
++}
++
++function processNdjsonLines(lines: string[], resolution: number, state: StreamState): void {
++  for (const trimmed of lines.map((l) => l.trim()).filter(Boolean)) {
++    if (state.total === null) {
++      const parsed = tryParseMeta(trimmed);
++      if (parsed !== null) { state.total = parsed; continue; }
++    }
++    const item = tryParseItem(trimmed, resolution);
++    if (item) state.items.push(item);
++  }
++}
++
++export async function getCwUnifiedCrimeHexStream(
++  params: CwUnifiedCrimeHexFetchParams,
++  onBatch: (items: CwUnifiedCrimeHexItem[], progress: CwUnifiedCrimeHexStreamProgress, isComplete?: boolean) => void,
++  token?: string
++): Promise<void> {
++  const url = buildStreamUrl(params);
++  const headers: Record<string, string> = { Accept: "application/x-ndjson" };
++  if (token) headers.Authorization = `Bearer ${token}`;
++  const res = await fetch(url, { headers, cache: "no-store" });
++  if (!res.ok) throw new Error(`Crime hex stream failed: ${res.status}`);
++  const reader = res.body?.getReader();
++  if (!reader) return;
++
++  const decoder = new TextDecoder();
++  let buffer = "";
++  const FLUSH_EVERY = 250;
++  const state: StreamState = { items: [], total: null, lastFlushed: 0 };
++
++  for (;;) {
++    const { done, value } = await reader.read();
++    if (done) break;
++    buffer += decoder.decode(value, { stream: true });
++    const lines = buffer.split("\n");
++    buffer = lines.pop() ?? "";
++    processNdjsonLines(lines, params.resolution, state);
++    if (state.items.length - state.lastFlushed >= FLUSH_EVERY) {
++      state.lastFlushed = state.items.length;
++      onBatch(state.items.slice(), { loaded: state.items.length, total: state.total }, false);
++    }
++  }
++  if (state.items.length > state.lastFlushed || state.items.length > 0) {
++    onBatch(state.items.slice(), { loaded: state.items.length, total: state.total }, true);
++  }
++}
++
++/** Raw crime point from backend - frontend does all hex logic */
++export interface CwUnifiedCrimePoint {
++  lat: number;
++  lng: number;
++  crime_category: string;
++  incident_type: string;
++}
++
++export interface CwUnifiedCrimePointsResponse {
++  success: boolean;
++  data: CwUnifiedCrimePoint[];
++}
++
++export async function getCwUnifiedCrimePoints(
++  token?: string
++): Promise<CwUnifiedCrimePointsResponse> {
++  return api.get<CwUnifiedCrimePointsResponse>("/cw-unified-crime-hex/points", {
++    token,
++  });
++}
++
++/* ── Full hex cache from Go safety router (/hexes/all) ───────────── */
++
++interface GoHexSlimItem {
++  h: string;
++  ci: number;
++  tc: number;
++  la: number;
++  ln: number;
++  cr?: Record<string, number>;
++  ct?: Record<string, number>;
++  pm?: number;
++  om?: number;
++  ss?: Record<string, number>;
++}
++
++function goSlimToItem(g: GoHexSlimItem): CwUnifiedCrimeHexItem {
++  return {
++    h3Index: g.h,
++    resolution: 8,
++    totalCount: g.tc,
++    drugCount: 0,
++    violentCount: 0,
++    propertyCount: 0,
++    incidentTypeCounts: {},
++    colorIndex: g.ci,
++    lat: g.la,
++    lng: g.ln,
++    cr: g.cr,
++    ct: g.ct,
++    poiModifier: g.pm,
++    osmModifier: g.om,
++    ss: g.ss,
++  };
++}
++
++/**
++ * Stream-parse a JSON array response into individually-parsed items without
++ * ever building the full decompressed string (which exceeds V8's ~512 MB cap).
++ *
++ * Uses native `indexOf` on the known top-level delimiter `},{"h":` which is
++ * safe because Go marshals hexSlimItem with `H3` (`json:"h"`) as the first
++ * field, and no nested Record keys start with `"h"`.  This is orders of
++ * magnitude faster than a JS-level character-by-character state machine.
++ *
++ * @param mapper  Optional transform applied to each parsed object inline,
++ *                avoiding a second full-array allocation for `.map()`.
++ * @param onBatch Called every ~10 000 items so callers can render progressively.
++ */
++async function streamParseJsonArray<TRaw, TOut = TRaw>(
++  res: Response,
++  onProgress?: (pct: number, statusText?: string) => void,
++  mapper?: (raw: TRaw) => TOut,
++  onBatch?: (items: TOut[], total: number) => void,
++): Promise<TOut[]> {
++  const hexCount = Number(res.headers.get("X-Hex-Count") ?? 0);
++  onProgress?.(5, `Downloading ${hexCount ? hexCount.toLocaleString() + " hexes" : "hex data"}…`);
++
++  const reader = res.body?.getReader();
++  if (!reader) throw new Error("Response body is not readable (streaming not supported)");
++
++  const DELIM = '},{"h":';
++  const BATCH_SIZE = 10_000;
++
++  const decoder = new TextDecoder();
++  const items: TOut[] = [];
++  let buffer = "";
++  let lastBatch = 0;
++
++  for (;;) {
++    const { done, value } = await reader.read();
++    if (done) break;
++
++    buffer += decoder.decode(value, { stream: true });
++    buffer = extractObjects(buffer, DELIM, items, mapper);
++
++    if (items.length - lastBatch >= BATCH_SIZE) {
++      lastBatch = items.length;
++      reportProgress(items.length, hexCount, onProgress);
++      onBatch?.(items, hexCount);
++      await new Promise<void>((r) => setTimeout(r, 0));
++    }
++  }
++
++  buffer += decoder.decode();
++  parseFinalObject(buffer, items, mapper);
++
++  return items;
++}
++
++function extractObjects<TRaw, TOut>(
++  buffer: string,
++  delim: string,
++  items: TOut[],
++  mapper?: (raw: TRaw) => TOut,
++): string {
++  let idx: number;
++  while ((idx = buffer.indexOf(delim)) !== -1) {
++    const fragment = buffer.slice(0, idx + 1);
++    buffer = buffer.slice(idx + 2);
++
++    const brace = fragment.indexOf("{");
++    if (brace >= 0) {
++      try {
++        const obj = JSON.parse(fragment.slice(brace)) as TRaw;
++        items.push(mapper ? mapper(obj) : (obj as unknown as TOut));
++      } catch { /* skip malformed */ }
++    }
++  }
++  return buffer;
++}
++
++function parseFinalObject<TRaw, TOut>(
++  buffer: string,
++  items: TOut[],
++  mapper?: (raw: TRaw) => TOut,
++): void {
++  let trimmed = buffer.trim();
++  if (trimmed.endsWith("]")) trimmed = trimmed.slice(0, -1);
++  const brace = trimmed.indexOf("{");
++  if (brace < 0) return;
++  try {
++    const obj = JSON.parse(trimmed.slice(brace)) as TRaw;
++    items.push(mapper ? mapper(obj) : (obj as unknown as TOut));
++  } catch { /* skip */ }
++}
++
++function reportProgress(
++  count: number,
++  total: number,
++  onProgress?: (pct: number, statusText?: string) => void,
++): void {
++  if (!onProgress) return;
++  if (total > 0) {
++    const pct = Math.min(90, Math.round((count / total) * 90));
++    onProgress(pct, `Parsed ${count.toLocaleString()} / ${total.toLocaleString()} hexes…`);
++  } else {
++    onProgress(50, `Parsed ${count.toLocaleString()} hexes…`);
++  }
++}
++
++/** Full South Africa bbox for wolf-server fallback when Go router /hexes/all is unavailable. */
++const SA_BBOX = { west: 16, south: -35, east: 33, north: -22 };
++
++/**
++ * Fetch the full hex collection (Go `/hexes/all` payload).
++ *
++ * **Production:** `GET /pathfinder/hexes/all` (Vercel rewrite → pathfinder.communitywolf.com).
++ * Same-origin request avoids CORS entirely.
++ *
++ * **Local dev:** Direct to Go router via `VITE_SAFETY_ROUTER_URL` or Vite proxy.
++ *
++ * **Fallback:** Mongo viewport API via wolf-server (`getCwUnifiedCrimeHexData`) when pathfinder
++ * returns 401, 404, or 503.
++ */
++export async function getAllCrimeHex(
++  token?: string,
++  onProgress?: (pct: number, statusText?: string) => void,
++  onBatch?: (items: CwUnifiedCrimeHexItem[], total: number) => void,
++): Promise<CwUnifiedCrimeHexItem[]> {
++  onProgress?.(0, "Checking local cache…");
++  const cached = await getHexCache();
++  if (cached?.data?.length) {
++    onProgress?.(50, `Restoring ${cached.data.length.toLocaleString()} hexes from cache…`);
++    onBatch?.(cached.data as CwUnifiedCrimeHexItem[], cached.data.length);
++    await new Promise((r) => setTimeout(r, 0)); // yield to let UI update
++    onProgress?.(100, `Loaded ${cached.data.length.toLocaleString()} hexes (cached)`);
++    return cached.data as CwUnifiedCrimeHexItem[];
++  }
++
++  const routerUrl = getSafetyRouterBaseUrl();
++  const url = `${routerUrl}/hexes/all`;
++  const auth = getSafetyRouterAuth(token);
++  const headers: Record<string, string> = { Accept: "application/json" };
++  if (auth) headers.Authorization = `Bearer ${auth}`;
++
++  onProgress?.(0, "Connecting to safety router…");
++  const res = await fetch(url, { headers, cache: "no-store" });
++
++  if (res.ok) {
++    const items = await streamParseJsonArray<GoHexSlimItem, CwUnifiedCrimeHexItem>(
++      res,
++      onProgress,
++      goSlimToItem,
++      onBatch,
++    );
++    onProgress?.(100, `Loaded ${items.length.toLocaleString()} hexes`);
++    void setHexCache(items);
++    return items;
++  }
++
++  // Fallback to wolf-server when Go router unavailable (404/503) or unauthorized (401)
++  if (res.status === 401 || res.status === 404 || res.status === 503) {
++    onProgress?.(
++      0,
++      res.status === 401 ? "Auth required, trying wolf-server…" : "Safety router unavailable, trying wolf-server…",
++    );
++    try {
++      const fallback = await getCwUnifiedCrimeHexData({ ...SA_BBOX, resolution: 8 }, token);
++      const rawItems = fallback?.data ?? [];
++      const items = rawItems.map((d) => {
++        let lat = d.lat;
++        let lng = d.lng;
++        if (lat == null || lng == null) {
++          try {
++            [lat, lng] = cellToLatLng(d.h3Index);
++          } catch {
++            /* skip invalid h3 */
++          }
++        }
++        return { ...d, lat, lng } as CwUnifiedCrimeHexItem;
++      });
++      onProgress?.(100, `Loaded ${items.length.toLocaleString()} hexes (wolf-server)`);
++      void setHexCache(items);
++      return items;
++    } catch (err) {
++      throw new Error(
++        `Safety router unavailable and wolf-server fallback failed: ${err instanceof Error ? err.message : String(err)}`,
++      );
++    }
++  }
++
++  throw new Error(`Safety router /hexes/all failed: ${res.status}`);
++}
++
++/* ── Hex score/breakdown from Go backend ───────────────────────────── */
++
++/** Request body for POST /hexes/score (toggle-based re-scoring). */
++export interface HexScoreRequest {
++  intent: string;
++  activeCodes: string[];
++  modifiers: { poi: boolean; osm: boolean };
++  hexIds: string[];
++}
++
++/** One result from POST /hexes/score. */
++export interface HexScoreResult {
++  h3: string;
++  safetyScore: number;
++  colorIndex: number;
++}
++
++/** Not wired on community map — avoids browser → pathfinder (CORS). Add wolf-server proxy if needed. */
++export async function postHexScore(
++  _req: HexScoreRequest,
++  _token?: string
++): Promise<HexScoreResult[]> {
++  throw new Error("Hex score is not available on the community map");
++}
++
++/** Response from GET /hexes/breakdown. Matches HexScoreBreakdown. */
++export interface HexBreakdownResponse {
++  intent: string;
++  crimeTypes: Array<{
++    code: string;
++    fullName: string;
++    bucket: string;
++    riskScore: number;
++    severity: number;
++    intentMult: number;
++    effectiveWeight: number;
++    weightedContribution: number;
++    active: boolean;
++    trend?: number;
++  }>;
++  totalMultiplier: number;
++  normalizedRisk: number;
++  poiAdjustment: number;
++  osmAdjustment: number;
++  finalRisk: number;
++  safetyScore: number;
++  colorIndex: number;
++  hasData: boolean;
++}
++
++/** Not wired on community map — avoids browser → pathfinder (CORS). */
++export async function getHexBreakdown(
++  _h3: string,
++  _intent: string,
++  _codes: string[],
++  _poi: boolean,
++  _osm: boolean,
++  _token?: string
++): Promise<HexBreakdownResponse> {
++  throw new Error("Hex breakdown is not available on the community map");
++}
++
++/* ── Hex detail API (for the detail drawer) ──────────────────────── */
++
++export interface HexDetailPrecinct {
++  name: string;
++  safetyScore: number;
++  riskScore: number;
++}
++
++export interface HexDetailNearbyPoi {
++  type: string;
++  name: string;
++  distanceKm: number;
++}
++
++export interface HexDetailResponse {
++  h3Index: string;
++  lat: number;
++  lng: number;
++  safetyScore: number;
++  colorIndex: number;
++  precinct?: HexDetailPrecinct;
++  nearbyPois: HexDetailNearbyPoi[];
++  recentReports: {
++    count: number;
++    severitySum: number;
++    categories: string[];
++  };
++  liveThreats: {
++    count: number;
++    maxScore: number;
++    keywords: string[];
++  };
++}
++
++export async function getCwUnifiedCrimeHexDetail(
++  h3Index: string,
++  token?: string,
++): Promise<HexDetailResponse> {
++  return api.get<HexDetailResponse>(`/cw-unified-crime-hex/detail/${h3Index}`, {
++    token,
++  });
++}
+diff --git a/src/utils/h3-geo.ts b/src/utils/h3-geo.ts
+new file mode 100644
+index 0000000..05f7ce5
+--- /dev/null
++++ b/src/utils/h3-geo.ts
+@@ -0,0 +1,16 @@
++/**
++ * H3 cell boundary → GeoJSON ring (lng, lat), closed ring.
++ */
++import { cellToBoundary, type H3Index } from "h3-js";
++
++export function h3ToGeoJsonPolygon(h3Index: H3Index): number[][] {
++  const boundary = cellToBoundary(h3Index, true);
++  if (boundary.length > 0) {
++    const first = boundary[0];
++    const last = boundary.at(-1);
++    if (last && (first[0] !== last[0] || first[1] !== last[1])) {
++      return [...boundary.map((c) => [c[0], c[1]]), [first[0], first[1]]];
++    }
++  }
++  return boundary.map((c) => [c[0], c[1]]);
++}
+diff --git a/src/utils/hex-idb-cache.ts b/src/utils/hex-idb-cache.ts
+new file mode 100644
+index 0000000..7e8189b
+--- /dev/null
++++ b/src/utils/hex-idb-cache.ts
+@@ -0,0 +1,93 @@
++/**
++ * IndexedDB cache for full crime hex data (~1.56M items).
++ * Enables instant page loads when data is fresh; avoids re-fetching on every navigation.
++ */
++
++const DB_NAME = "wolf-hex-cache";
++const DB_VERSION = 1;
++const STORE_NAME = "hexes";
++const CACHE_KEY = "all";
++const TTL_MS = 60 * 60 * 1000; // 1 hour
++const CACHE_SCHEMA_VERSION = 2;
++
++export interface HexCacheEntry<T = unknown> {
++  data: T[];
++  storedAt: number;
++  schemaVersion?: number;
++}
++
++function openDb(): Promise<IDBDatabase> {
++  return new Promise((resolve, reject) => {
++    const req = indexedDB.open(DB_NAME, DB_VERSION);
++    req.onerror = () => reject(req.error);
++    req.onsuccess = () => resolve(req.result);
++    req.onupgradeneeded = (e) => {
++      const db = (e.target as IDBOpenDBRequest).result;
++      if (!db.objectStoreNames.contains(STORE_NAME)) {
++        db.createObjectStore(STORE_NAME, { keyPath: "key" });
++      }
++    };
++  });
++}
++
++export async function getHexCache(): Promise<HexCacheEntry | null> {
++  try {
++    const db = await openDb();
++    return new Promise((resolve, reject) => {
++      const tx = db.transaction(STORE_NAME, "readonly");
++      const store = tx.objectStore(STORE_NAME);
++      const req = store.get(CACHE_KEY);
++      req.onerror = () => {
++        db.close();
++        reject(req.error);
++      };
++      req.onsuccess = () => {
++        db.close();
++        const entry = req.result as (HexCacheEntry & { key?: string }) | undefined;
++        if (!entry?.data?.length) {
++          resolve(null);
++          return;
++        }
++        if ((entry.schemaVersion ?? 1) < CACHE_SCHEMA_VERSION) {
++          resolve(null);
++          return;
++        }
++        const age = Date.now() - entry.storedAt;
++        if (age > TTL_MS) {
++          resolve(null);
++          return;
++        }
++        resolve(entry);
++      };
++    });
++  } catch {
++    return null;
++  }
++}
++
++export async function setHexCache(data: unknown[]): Promise<void> {
++  try {
++    const db = await openDb();
++    return new Promise((resolve, reject) => {
++      const tx = db.transaction(STORE_NAME, "readwrite");
++      const store = tx.objectStore(STORE_NAME);
++      const entry: HexCacheEntry & { key: string } = {
++        key: CACHE_KEY,
++        data,
++        storedAt: Date.now(),
++        schemaVersion: CACHE_SCHEMA_VERSION,
++      };
++      const req = store.put(entry);
++      req.onerror = () => {
++        db.close();
++        reject(req.error);
++      };
++      req.onsuccess = () => {
++        db.close();
++        resolve();
++      };
++    });
++  } catch {
++    // Non-fatal
++  }
++}
+diff --git a/src/utils/hex-resolution.ts b/src/utils/hex-resolution.ts
+new file mode 100644
+index 0000000..81cf9db
+--- /dev/null
++++ b/src/utils/hex-resolution.ts
+@@ -0,0 +1,147 @@
++/**
++ * Hex resolution utilities for the safety routing crime hex layer.
++ *
++ * The Go backend serves R8 hexes. The frontend pre-aggregates to R7 and R6
++ * at load time so zooming out doesn't render 1.56M polygons.
++ */
++
++import type { CwUnifiedCrimeHexItem } from "@/utils/cw-unified-crime-hex-api";
++import { cellToParent } from "h3-js";
++
++/**
++ * Map a Mapbox GL zoom level to the appropriate H3 resolution for display.
++ *   zoom >= 11  → R8 (native, ~460m edge)
++ *   zoom 9–10   → R7 (~1.2km edge)
++ *   zoom < 9    → R6 (~3.2km edge)
++ */
++export function zoomToHexResolution(zoom: number): number {
++  if (zoom >= 11) return 8;
++  if (zoom >= 9) return 7;
++  return 6;
++}
++
++/**
++ * Aggregate R8 hex items to a coarser resolution by grouping on parent H3 index.
++ * Uses area-weighted averaging for scores and sum for counts.
++ */
++export function aggregateHexesToResolution(
++  items: CwUnifiedCrimeHexItem[],
++  targetResolution: number,
++): CwUnifiedCrimeHexItem[] {
++  if (targetResolution >= 8) return items;
++
++  const groups = new Map<string, CwUnifiedCrimeHexItem[]>();
++
++  for (const item of items) {
++    const parentH3 = cellToParent(item.h3Index, targetResolution);
++    const group = groups.get(parentH3);
++    if (group) group.push(item);
++    else groups.set(parentH3, [item]);
++  }
++
++  const result: CwUnifiedCrimeHexItem[] = [];
++
++  for (const [parentH3, children] of groups) {
++    const n = children.length;
++    const totalCount = children.reduce((s, c) => s + c.totalCount, 0);
++    const avgColorIndex = Math.round(children.reduce((s, c) => s + c.colorIndex, 0) / n);
++    const avgLat = children.reduce((s, c) => s + (c.lat ?? 0), 0) / n;
++    const avgLng = children.reduce((s, c) => s + (c.lng ?? 0), 0) / n;
++
++    const cr = aggregateCrimeRisks(children);
++    const ct = aggregateCrimeTrends(children);
++    const ss = aggregateSafetyScores(children);
++    const poiModifier = averageOptionalField(children, "poiModifier");
++    const osmModifier = averageOptionalField(children, "osmModifier");
++
++    result.push({
++      h3Index: parentH3,
++      resolution: targetResolution,
++      totalCount,
++      drugCount: children.reduce((s, c) => s + c.drugCount, 0),
++      violentCount: children.reduce((s, c) => s + c.violentCount, 0),
++      propertyCount: children.reduce((s, c) => s + c.propertyCount, 0),
++      incidentTypeCounts: {},
++      colorIndex: avgColorIndex,
++      lat: avgLat,
++      lng: avgLng,
++      cr: Object.keys(cr).length > 0 ? cr : undefined,
++      ct: Object.keys(ct).length > 0 ? ct : undefined,
++      ss: Object.keys(ss).length > 0 ? ss : undefined,
++      poiModifier,
++      osmModifier,
++    } as CwUnifiedCrimeHexItem & { lat: number; lng: number });
++  }
++
++  return result;
++}
++
++function aggregateCrimeRisks(children: CwUnifiedCrimeHexItem[]): Record<string, number> {
++  const sums: Record<string, number> = {};
++  const counts: Record<string, number> = {};
++
++  for (const child of children) {
++    if (!child.cr) continue;
++    for (const [code, risk] of Object.entries(child.cr)) {
++      sums[code] = (sums[code] ?? 0) + risk;
++      counts[code] = (counts[code] ?? 0) + 1;
++    }
++  }
++
++  const result: Record<string, number> = {};
++  for (const code of Object.keys(sums)) {
++    result[code] = Math.round(sums[code] / counts[code]);
++  }
++  return result;
++}
++
++function aggregateCrimeTrends(children: CwUnifiedCrimeHexItem[]): Record<string, number> {
++  const sums: Record<string, number> = {};
++  const counts: Record<string, number> = {};
++
++  for (const child of children) {
++    if (!child.ct) continue;
++    for (const [code, trend] of Object.entries(child.ct)) {
++      sums[code] = (sums[code] ?? 0) + trend;
++      counts[code] = (counts[code] ?? 0) + 1;
++    }
++  }
++
++  const result: Record<string, number> = {};
++  for (const code of Object.keys(sums)) {
++    result[code] = Math.round(sums[code] / counts[code]);
++  }
++  return result;
++}
++
++function averageOptionalField(children: CwUnifiedCrimeHexItem[], field: "poiModifier" | "osmModifier"): number | undefined {
++  let sum = 0;
++  let count = 0;
++  for (const child of children) {
++    const v = child[field];
++    if (v != null) { sum += v; count++; }
++  }
++  return count > 0 ? sum / count : undefined;
++}
++
++/** Average per-intent safety scores so intent toggles work at R7/R6 zoom levels. */
++function aggregateSafetyScores(children: CwUnifiedCrimeHexItem[]): Record<string, number> {
++  const sums: Record<string, number> = {};
++  const counts: Record<string, number> = {};
++
++  for (const child of children) {
++    if (!child.ss) continue;
++    for (const [intent, score] of Object.entries(child.ss)) {
++      if (typeof score === "number") {
++        sums[intent] = (sums[intent] ?? 0) + score;
++        counts[intent] = (counts[intent] ?? 0) + 1;
++      }
++    }
++  }
++
++  const result: Record<string, number> = {};
++  for (const intent of Object.keys(sums)) {
++    result[intent] = Math.round(sums[intent] / counts[intent]);
++  }
++  return result;
++}
+diff --git a/src/utils/map-marker-icons.ts b/src/utils/map-marker-icons.ts
+index 18c2fba..5619897 100644
+--- a/src/utils/map-marker-icons.ts
++++ b/src/utils/map-marker-icons.ts
+@@ -90,6 +90,24 @@ function isColorDark(hex: string): boolean {
+   return 0.299 * r + 0.587 * g + 0.114 * b < 140;
+ }
+ 
++/** Plain Lucide icon to SVG data URL (POI markers). */
++function lucideToSvgDataUrl(
++  Icon: LucideIcon,
++  color: string,
++  width: number,
++  height: number = width
++): string {
++  const svg = renderToStaticMarkup(
++    createElement(Icon, {
++      size: Math.min(width, height),
++      color,
++      strokeWidth: 2.5,
++    })
++  );
++  const sized = svg.replace(/width="[^"]*"/, `width="${width}"`).replace(/height="[^"]*"/, `height="${height}"`);
++  return `data:image/svg+xml,${encodeURIComponent(sized)}`;
++}
++
+ function lucideToReportSvgDataUrl(
+   Icon: LucideIcon,
+   circleColor: string,
+@@ -288,7 +306,18 @@ const REPORT_SLUG_TO_SHAPE: Record<string, string> = Object.fromEntries(
+   Object.entries(REPORT_TYPE_ICONS).map(([k, v]) => [slugify(k), v.shape])
+ );
+ 
++/** Default POI icon id used when Places (Public) is on. */
++export const POI_MAP_DEFAULT_ICON_ID = "map-icon-poi-default-3b82f6";
++
+ function iconIdToDataUrl(iconId: string): { url: string; w: number; h: number } | null {
++  const poiRe = /^map-icon-poi-(.+)-([0-9a-f]{6})$/i;
++  const poiM = poiRe.exec(iconId);
++  if (poiM) {
++    const color = `#${poiM[2]}`;
++    const Icon = MapPin;
++    const h = 40;
++    return { url: lucideToSvgDataUrl(Icon, color, SIZE, h), w: SIZE, h };
++  }
+   const re = /^map-icon-report-(.+)-([0-9a-f]{6})$/i;
+   const m = re.exec(iconId);
+   if (!m) return null;
+@@ -338,6 +367,7 @@ function getAllIconIdsToLoad(): string[] {
+   for (const type of Object.keys(REPORT_TYPE_ICONS)) ids.add(getReportIconId(type));
+   for (const c of FALLBACK_COLORS) ids.add(`map-icon-report-default-${c.slice(1)}`);
+   ids.add(getReportIconId(null));
++  ids.add(POI_MAP_DEFAULT_ICON_ID);
+   return Array.from(ids);
+ }
+ 
+diff --git a/src/utils/map-poi.ts b/src/utils/map-poi.ts
+new file mode 100644
+index 0000000..998bdaf
+--- /dev/null
++++ b/src/utils/map-poi.ts
+@@ -0,0 +1,29 @@
++/**
++ * OSM / POI list for live map.
++ *
++ * Uses `GET /global/poi` — the "global" org ID bypasses org-ownership checks
++ * on wolf-server (organisationOwnershipMiddleware). POI data comes from
++ * Overpass/OpenStreetMap so it's the same regardless of organisation.
++ */
++import { api } from "@/utils/api";
++import type { POIMarker } from "@/types/poi.type";
++
++const POI_ORG_PATH = "global";
++
++export async function fetchOsmPoisForViewport(
++  lat: number,
++  lng: number,
++  radiusKm: number
++): Promise<POIMarker[]> {
++  const res = await api.get<{ pois: POIMarker[]; poiCount?: number }>(`/${POI_ORG_PATH}/poi`, {
++    query: {
++      lat: String(lat),
++      lng: String(lng),
++      radius: String(radiusKm),
++      onlyCoordinates: "true",
++      limit: "500",
++    },
++  });
++  const list = res.pois ?? [];
++  return list.map((p) => ({ ...p, source: "osm" as const }));
++}
+diff --git a/src/utils/police-precincts-api.ts b/src/utils/police-precincts-api.ts
+index abb399d..5fb1d34 100644
+--- a/src/utils/police-precincts-api.ts
++++ b/src/utils/police-precincts-api.ts
+@@ -4,7 +4,9 @@
+  * Falls back to bundled static files if the API is unavailable.
+  */
+ 
+-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
++import { getBackendApiUrl } from "@/utils/api";
++
++const API_URL = getBackendApiUrl();
+ const PRECINCTS_PATH =
+   (import.meta.env.VITE_POLICE_PRECINCTS_PATH as string | undefined)?.trim() || "police-precincts";
+ const PRECINCTS_BASE_URL = (import.meta.env.VITE_POLICE_PRECINCTS_URL as string | undefined)?.trim();
+diff --git a/src/utils/safety-routing-api.ts b/src/utils/safety-routing-api.ts
+new file mode 100644
+index 0000000..0e4d591
+--- /dev/null
++++ b/src/utils/safety-routing-api.ts
+@@ -0,0 +1,25 @@
++/**
++ * Go safety router (wolf-safety-router) — direct client for /hexes/all etc.
++ * Community app uses API key only (no Clerk).
++ *
++ * **Production (Vercel):** Uses `/pathfinder` same-origin rewrite (vercel.json) to proxy to
++ * `pathfinder.communitywolf.com`. This avoids CORS entirely — the browser sees a same-origin
++ * request and Vercel's edge proxies it to Hetzner.
++ *
++ * **Local dev:** Set `VITE_SAFETY_ROUTER_URL=http://localhost:8090` (or the pathfinder URL)
++ * to hit the Go router directly.
++ */
++
++const VERCEL_PROXY_PATH = "/pathfinder";
++const DIRECT_PATHFINDER_URL = "https://pathfinder.communitywolf.com";
++
++export function getSafetyRouterBaseUrl(): string {
++  if (!import.meta.env.DEV) return VERCEL_PROXY_PATH;
++  const env = (import.meta.env.VITE_SAFETY_ROUTER_URL as string | undefined)?.trim();
++  if (env) return env.replace(/\/+$/, "");
++  return DIRECT_PATHFINDER_URL;
++}
++
++export function getSafetyRouterAuth(_clerkToken?: string | null): string | undefined {
++  return (import.meta.env.VITE_SAFETY_ROUTER_API_KEY as string | undefined) || undefined;
++}
+diff --git a/vercel.json b/vercel.json
+index 3a48e56..62d7584 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -1,3 +1,7 @@
+ {
+-  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
++  "rewrites": [
++    { "source": "/pathfinder/:path*", "destination": "https://pathfinder.communitywolf.com/:path*" },
++    { "source": "/wolf-api/:path*", "destination": "https://wolf-data-api.onrender.com/api/:path*" },
++    { "source": "/(.*)", "destination": "/" }
++  ]
+ }
+diff --git a/vite.config.ts b/vite.config.ts
+index 23c3fb1..a311265 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -8,6 +8,18 @@ export default defineConfig(({ mode }) => ({
+   server: {
+     host: "::",
+     port: 8080,
++    proxy: {
++      "/pathfinder": {
++        target: "https://pathfinder.communitywolf.com",
++        changeOrigin: true,
++        rewrite: (p) => p.replace(/^\/pathfinder/, ""),
++      },
++      "/wolf-api": {
++        target: "https://wolf-data-api.onrender.com",
++        changeOrigin: true,
++        rewrite: (p) => p.replace(/^\/wolf-api/, "/api"),
++      },
++    },
+   },
+   plugins: [react(), mode === "development" && componentTagger()].filter(
+     Boolean
