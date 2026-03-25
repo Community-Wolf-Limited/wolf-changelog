@@ -23,3 +23,12 @@ version: "1.0"
 
 - **Device schedule create (`POST /device-auth/patrol-schedules`)**: Safer parsing of `startDatetime` / `endDatetime` (string, number, or `Date` only — no arbitrary object stringification), optional **`useTimeRange`** with **`startTime`** / **`endTime`** (HH:MM), and refactors (**`parseDeviceScheduleCreateBody`**, **`parseScheduleTimeRange`**) to satisfy lint complexity rules.
 - **Device patrol create (`POST /device-auth/patrols`)**: For **`own_device_created`** grants, the **route** must belong to the requesting device user (**`createdByStaffId`**), enforced via **`findPatrolRouteForDeviceCreate`**.
+
+## Follow-up (device patrol assignment updates and live location)
+
+- **Assignments from the field**: Staff can **update assignment details**, **toggle active state**, and **retire** assignments from the patrol app where permitted, with **audit history** for accountability.
+- **Live location**: Processing path for device-reported positions is tightened so **maps and operations views** stay aligned with what the field app sends.
+
+## Engineering reference (device patrol updates ship)
+
+- **Commit on `feat/patrol-field-audit-device-writes`**: `5d1cf92` (device patrol updates, audit, GPS socket handler extraction, live-position wiring).

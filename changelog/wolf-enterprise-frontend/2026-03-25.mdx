@@ -20,3 +20,12 @@ version: "2.45"
 ## Follow-up (live tracking map)
 
 - **`LiveTrackingTab`**: Persistent **`Map<staffId, Marker>`** markers with **`setLngLat`** updates, **initial fit once** (not on every GPS tick), **Fit all** control, and map teardown cleanup that snapshots the markers map at effect start for **eslint `react-hooks/exhaustive-deps`** compliance.
+
+## Follow-up (field access connection resilience)
+
+- **Live map**: You can see when the **field access map** is **offline or reconnecting**, and it **recovers** more reliably when the browser tab was in the background or the network dropped.
+- **Live tracking**: Patrol-events **live socket** behavior matches the same **reconnect-on-focus** pattern so the operations view does not silently stall.
+
+## Engineering reference (field access resilience ship)
+
+- **Commit on `feat/patrol-field-governance-ux-audit`**: `7594bef` (patrol events socket tuning, field access live map connection state, `LiveTrackingTab` wiring).

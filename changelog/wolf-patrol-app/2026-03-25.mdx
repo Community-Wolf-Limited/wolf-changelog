@@ -26,3 +26,14 @@ version: "1.2"
 - **`MapViewSafe` / web**: Namespace import for **MapLibre** (non-deprecated default export), **`MapMarkerVariant`** including **`dot`**, **readonly** marker props, **`replaceAll`** for stable marker ids, and **`MapMarkerVariant`** type alias on web.
 - **Schedules API**: **`CreatePatrolScheduleInput`** extended with optional **`useTimeRange`**, **`startTime`**, **`endTime`** for device schedule creation.
 - **Dependencies**: **`react-native-svg`** added as the required peer for **Lucide** icons so the native build and **Expo Doctor** checks stay healthy on custom dev clients.
+
+## Follow-up (patrol assignments and realtime resilience)
+
+- **Assignments tab**: Browse, search, and filter patrol assignments; open an assignment to **edit** details, **pause or resume**, or **remove** assignments you manage from the app.
+- **Create patrol**: Wizard split into clearer steps, with **priority** and **description** so new assignments match how your team works.
+- **Access prompts**: When your permissions need a refresh, the app surfaces that clearly instead of leaving you stuck.
+- **Realtime**: Patrol-related live updates reconnect more reliably after network blips or long backgrounding.
+
+## Engineering reference (patrol assignments ship)
+
+- **Commit on `master`**: `ca96e96` (assignments tab, edit flow, patrol API client, socket tuning).
