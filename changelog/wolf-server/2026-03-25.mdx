@@ -1,0 +1,20 @@
+---
+title: "Patrol field — live staff positions, heartbeat API, and grant tracking mode"
+description: "Patrol statistics and gating for upcoming work, patrol-event breadcrumbs, and staff live positions with a heartbeat API plus grant tracking mode for operational visibility."
+date: "2026-03-25"
+tags: ["Feature", "Enhancement", "Enterprise", "Platform"]
+version: "1.0"
+---
+
+## What's New
+
+- **Patrol stats and gating**: **Patrol statistics** endpoints and **gating** for **upcoming** patrol-related work, with **Sonar-friendly** refactors on the device-auth side.
+- **Patrol events**: **Breadcrumbs** on patrol-event flows improve traceability across related records.
+- **Live operations**: **Staff live positions**, a **heartbeat API**, and **grant tracking mode** support real-time awareness of who is in the field and how grant state is applied.
+
+## Engineering reference
+
+- **First-parent merges on `main`**: PR **#56** and **#57** (`b4aae8b`, `b4e70cc`) on `feat/patrol-field-audit-device-writes`.
+- **Notable commits**: `bd1ab73` (patrol-stats / upcoming gating / patrol-events breadcrumbs), `7bc0a3a` (staff live positions, heartbeat API, grant tracking mode).
+- **Schema and modules** (from diff summary): new **`staff-live-position`** schema, expanded **patrol schedule** and related **patrol route/site** schemas, supporting **staff** repository and **middleware** updates.
+- **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-server-full.diff` (cumulative from `3a0ad45^..origin/main`).

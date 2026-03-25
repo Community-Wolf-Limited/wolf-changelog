@@ -1,0 +1,32 @@
+---
+title: "Patrol field access hub, Stripe billing merge, and live governance UX"
+description: "Patrol Field Access & Audit hub with navigation; Stripe billing integration merged to main; dependency and CI hardening; governance UX for grants; realtime grant toasts; and live field updates through the live-tracking tab."
+date: "2026-03-24"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "2.44"
+---
+
+## What's New
+
+- **Patrol Field Access & Audit hub**: Dedicated **Patrol Field Access** experience with **navigation** into the hub, initial **access-hub UI** work, and **ESLint** dependency alignment for the new surface.
+- **Stripe billing (PR #69)**: **`feature/stripe-integration-v2`** is merged to **`main`**—**checkout drafting**, **sales-oriented** billing flows, **net billing change** visibility in the checkout builder, **patrol management** display pricing update, and the **Billing** workspace UI (with feature gating). Lockfile and **Vercel** optional dependencies (**Rollup**, **SWC** Linux bindings) support **`npm ci`** on CI and production builds.
+- **Governance UX (PR #71)**: **Staff names**, clearer **activity copy**, and **dialogs** for **deny**, **revoke**, and **reject** paths on patrol-field governance.
+- **Realtime grants (PR #72)**: **Grant requests** and **device acknowledgement** surface as **toasts** so operators see the handshake in real time.
+- **Field updates (PR #73)**: **Live updates** and **UI polish** across patrol field access views.
+- **Live tracking (PR #74)**: **Live tracking** tab and **`patrol-event:location`** socket integration for location streams on patrol events.
+
+## Improvements
+
+- **Dependencies**: **`npm audit fix`** passes; **`@swc/core`** pinned to **1.15.21** for **lockfile** parity with **`npm ci`**.
+- **CI / Vercel**: **Lockfile regeneration** with **npm 11**, **Rollup** and **SWC** native bindings for Linux builds, and workflow alignment for **Node 24** + cached **`npm ci`**.
+- **Integration hygiene**: **Staging** merges and a short **revert / reapply** cycle on **`feature/patrol-field-access-hub`** align history while keeping patrol-field and billing work consistent (see merge commits below).
+
+## Bug Fixes
+
+- **Dependencies**: Pinned toolchain packages resolve **optional dependency** drift between local and Vercel environments.
+
+## Engineering reference
+
+- **Merge commits on `main` (selected)**: `4f450f2` (**PR #69** — Stripe), `9894dcc` (**PR #70** — patrol-field-access-hub), `0f2b158` (**PR #71**), `20c08c6` (**PR #72**), `62bb14c` (**PR #73**), `588309b` (**PR #74**). Supporting merges: `a872380`, `027366e`, `0e168e1`, `586b1c0` (staging alignment / revert-reapply choreography).
+- **Notable non-merge commits**: `56b2d05`, `e16087a`, `efaa106`, `954f81c`, `7b66aa4`, `64399a2`.
+- **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-enterprise-frontend-full.diff` (range `ef702d9^..origin/main` — first first-parent commit on or after 2026-03-22 through tip).

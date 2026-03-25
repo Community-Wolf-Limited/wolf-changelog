@@ -1,0 +1,30 @@
+---
+title: "Patrol field — device grants, governance, audits, and mobile home events"
+description: "Device-authenticated patrol field grants and proposals, governance and audit streams, Clerk socket hardening, audit logging for device-created sites and routes, push and staff assignment APIs, and upcoming patrol events for the mobile home surface."
+date: "2026-03-24"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise", "Platform"]
+version: "1.0"
+---
+
+## What's New
+
+- **Patrol field grants (device auth)**: APIs and socket flows for **field grants**, **proposals**, and **governance**, with **Clerk token verification** on the socket path so device and staff sessions align with org policy.
+- **Governance and audit**: **Patrol-field governance** streams and **quality hardening** around device-scoped writes; **audit logging** covers device-created **sites**, **routes**, and **patrol events** (including proposal flows).
+- **Operations**: New **`DEVICE_PATROL_GRANT_REQUIRED`** environment flag is **documented** for deployments that must enforce grant checks for field devices.
+- **Realtime and assignments**: **Patrol-field push**, **grant-related socket events**, and **staff assignment** APIs wire the mobile and enterprise surfaces to the same grant state.
+- **Device writes and notifications**: **Audit of device writes**, **configuration notifications**, and related **Sonar-driven** cleanups keep patrol configuration changes observable.
+- **Mobile home**: **Upcoming patrol events** for the **mobile home** experience, including **Expo push** behaviour when a token is not yet available.
+
+## Improvements
+
+- **Socket stability**: **Clerk `verifyToken` errors** (for example expired JWTs) are **caught** so they cannot **terminate the server process**—clients get a controlled failure instead of a hard crash.
+
+## Bug Fixes
+
+- **Sockets**: Expired or invalid Clerk tokens on the patrol/device socket path no longer risk taking down the whole Node process.
+
+## Engineering reference
+
+- **First-parent merges on `main` (UTC+2 window)**: PR **#52**–**#55** from `feat/patrol-field-audit-device-writes` (merge commits `4ef4842`, `02dbe0d`, `790355a`, `b9520be` on the integration train).
+- **Notable commits**: `9b76a66` (device-auth grants / governance API / Clerk socket verify), `a74a6b6` (patrol-field governance and audit streams), `aa2bdbd` (socket Clerk error handling), `6674cb9` / `832b94d` (audit log + env docs), `c42e916`, `c122f40`, `0f7bb7c` (push, device write audit, upcoming events + push).
+- **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-server-full.diff` (cumulative from `3a0ad45^..origin/main`).

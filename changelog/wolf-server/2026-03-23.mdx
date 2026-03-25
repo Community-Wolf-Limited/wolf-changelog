@@ -1,0 +1,16 @@
+---
+title: "POI NDJSON stream — CORS and compression"
+description: "The POI progressive stream accepts standard browser Accept headers and skips response compression on the NDJSON endpoint so streaming clients behave reliably."
+date: "2026-03-23"
+tags: ["Bug Fix", "Enterprise", "Platform"]
+version: "1.0"
+---
+
+## What's New
+
+- **POI streaming**: The `/poi/stream` path is tuned for **NDJSON** clients: responses honour **`Accept`** negotiation used by browsers and proxies, and **compression is skipped** on this route so chunks are not buffered in ways that break progressive loading.
+
+## Engineering reference
+
+- **Merge base for 2026-03-22 → 03-25 audit**: cumulative diff on `main` from parent of `3a0ad45` through tip includes this commit (`3a0ad45` — *fix(poi): CORS Accept for NDJSON stream, skip compression on /poi/stream*).
+- **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-server-full.diff` (same range as the audit script: `3a0ad45^..origin/main` at time of export).

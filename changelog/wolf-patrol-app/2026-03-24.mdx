@@ -1,0 +1,24 @@
+---
+title: "Field access, routes and sites, GPS, and patrol-helper UX merges"
+description: "Patrol Helper merges for mobile map/GPS UX and field-access clarity; capabilities and grant versioning; routes and sites editing with field-access gates; and upcoming patrol home with offline and push entrypoints."
+date: "2026-03-24"
+tags: ["Feature", "Enhancement", "Bug Fix", "Enterprise"]
+version: "1.1"
+---
+
+## What's New
+
+- **Mobile UX (PR #1 — `feature/patrol-field-mobile-ux`)**: **Faster map GPS**, **location prompt** behaviour on tabs, **dashboard** split, **Expo** / **tsconfig** ergonomics, and related **mobile tab** work merged to **`master`** (`78529d0`, `c6c5f29`).
+- **UX clarity (PR #2 — `feat/patrol-field-ux-clarity`)**: Documentation clarifying **direct site/route writes** versus the **optional proposal queue**; browse **sites** and **routes**, **push** registration, and **assignments** (`525af68`, `442fd5f`).
+- **Field access**: **Capabilities** API surface, **grant version** headers, **schedules** and **access** tabs; **field-access gate**, **Routes** tab, **site/route** editing, **GPS** and API client updates (`5f68aee`).
+- **Home and reliability**: **Upcoming patrol** home emphasis, **grant lockout** messaging, **offline** UX, and **push** entrypoint wiring (`0e09a3b`).
+
+## Improvements
+
+- **API clients**: Expanded **patrol-event**, **route**, **site**, **schedules**, **staff**, and **capabilities** modules align the app with server grant and field-access APIs.
+
+## Engineering reference
+
+- **Repository**: `Community-Wolf-Limited/patrol-helper` — default branch **`master`** (not `main`).
+- **Merge commits**: `78529d0` (**PR #1**), `525af68` (**PR #2**), `442fd5f` (merge UX branch to `master`).
+- **Full diff artifact**: `internal/git-audits/2026-03-22-to-03-25/wolf-patrol-app-full.diff` (range `78529d0^..origin/master` — from parent of PR #1 merge through tip).
