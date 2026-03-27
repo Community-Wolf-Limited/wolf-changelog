@@ -1,0 +1,5 @@
+{
+  "displayName": "Scheduled jobs & exports",
+  "order": 63,
+  "description": "Background workers for scheduled reports, exports, and data delivery to organisations."
+}

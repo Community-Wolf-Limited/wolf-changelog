@@ -1,0 +1,15 @@
+---
+title: "Respond to control-room location prompts with an automatic GPS refresh"
+description: "When the control room asks for your location, the app can wake the right background flow so sharing picks up without hunting through settings."
+date: "2026-03-27"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's New
+
+- **Location prompt handling**: If you receive a **control-room prompt** to share location, the app **checks your grant state** and triggers the **idle location heartbeat** path so GPS updates resume in line with your permissions.
+
+## Improvements
+
+- **Faster recovery**: Reduces cases where the map looks stale because background location needed a nudge after a notification.
