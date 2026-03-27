@@ -1,0 +1,11 @@
+---
+title: "Build tooling: clearer Node built-in imports"
+description: "Minor Vite configuration update to use the standard Node.js module prefix for path resolution."
+date: "2026-03-27"
+tags: ["Enhancement", "Platform"]
+version: "1.0"
+---
+
+## Improvements
+
+- **Tooling**: The community map build now imports the Node **`path`** helper using the **`node:`** prefix recommended for modern Node and bundlers, reducing ambiguity during builds.

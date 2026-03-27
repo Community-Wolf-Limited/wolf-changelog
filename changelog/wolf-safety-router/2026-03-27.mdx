@@ -1,0 +1,20 @@
+---
+title: "Safer routing on real roads; clearer API errors; service discovery"
+description: "The safety routing service can combine hex-based safety with road network detail where data is available, returns consistent error payloads, and exposes a simple discovery document for integrators."
+date: "2026-03-27"
+tags: ["Feature", "Enhancement", "Security", "Platform"]
+version: "1.0"
+---
+
+## What's New
+
+- **Road-aware routing**: Where road network data is loaded for South Africa, routing can **prefer real road geometry** after the safest hex corridor is found—better paths when the data is present.
+- **Operations pipeline**: Documented and scripted steps to **load road data** into the platform database on Linux-style hosts (with automation-friendly containers where needed).
+- **Consistent errors**: API failures return a **predictable JSON shape** (human message, HTTP status, machine-readable code, and request correlation when available)—easier for partners to log and retry.
+- **Discovery**: A small **metadata** response describes **what the running instance supports** (version, capabilities, documentation links) so integrations can self-check after deploy.
+
+## Improvements
+
+- **Wrong HTTP method**: Clients using GET on routes that expect POST receive a clear **405** with guidance instead of a confusing 404.
+- **Rate limiting**: Throttled responses use the **same error format** as the rest of the API.
+- **Documentation**: Expanded public docs for **integration**, **collections**, and **operations** (including how road data is produced).
