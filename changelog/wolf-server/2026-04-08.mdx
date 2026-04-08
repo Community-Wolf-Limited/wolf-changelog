@@ -1,0 +1,34 @@
+---
+title: "Platform APIs: bulk patrol actions, richer exports, mobile schedules, and simpler device access"
+description: "Operators can change many patrol records at once, download structured exports with sensible limits, manage schedules from the field app, and use device stats without a separate grant layer."
+date: "2026-04-08"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's new
+
+- **Bulk actions**: Activate, pause, or clear many patrol assignments, routes, or schedules in one operation from integrated tools.
+- **Exports**: Download large reports as structured files when your role allows, with safeguards so exports stay reliable at scale.
+- **Mobile schedules**: Field apps can list, update, and remove schedules with the same rules as the dashboard.
+- **Richer context**: Schedules can express more real-world patterns; sites can carry descriptions and service expectations; patrol statistics surface friendlier labels and time ranges.
+- **Larger rosters**: Staff directories scale further for big organisations; patrol listings show who is assigned more clearly.
+- **Diagnostics**: Engineers can run documented checks when environment or auth issues appear in staging.
+
+## Improvements
+
+- Patrol event ordering is stable when many events share the same minute.
+- Schedule execution respects organisation time zones more reliably than server-local time alone.
+- Special device tokens are recognised without being mistaken for standard browser sessions.
+- Quieter admin logging in production unless explicitly debugging.
+
+## Bug fixes
+
+- Fixed cases where turning a patrol on or off accidentally cleared assignee information.
+- Fixed validation and activation edge cases for one-off schedules and route checkpoints.
+- Improved handling of linked routes and schedules when data arrives in different shapes from the database.
+
+## Removed
+
+- The **device grant / permission-request** subsystem for patrol configuration is retired in favour of simpler defaults and explicit flags only where still required.
+- Unused realtime services for patrol events and reports were removed as dead code.

@@ -1,0 +1,33 @@
+---
+title: "Patrol app: sign-in, SLA home, schedules, and a simpler permissions model"
+description: "Clerk-based sign-in with fallbacks, a dashboard for site health and recent activity, full schedule management in the field, and removal of grant gates and always-on background tracking."
+date: "2026-04-08"
+tags: ["Feature", "Bug Fix", "Enterprise"]
+version: "1.0"
+---
+
+## What's new
+
+- **Account access**: Email and password sign-in with a phone path if the primary flow is slow or unavailable.
+- **Operations overview**: Home shows how sites are performing against expectations, key numbers at a glance, and recent patrol activity—with filters you can keep between sessions.
+- **Schedules end-to-end**: Create, review, edit, and remove schedules from the app with native pickers and a guided wizard shared across flows.
+- **Clearer forms**: Searchable pickers for places, routes, people, and time zones; required fields are obvious; drafts survive switching apps or taking a call.
+- **Routes**: Rename and renumber checkpoints more predictably; open a new route right after saving; trigger a patrol from the detail screen when needed.
+- **Multi-org**: Switch organisation from the More area when your account spans several tenants.
+
+## Improvements
+
+- List screens show helpful empty states instead of blank pages.
+- Patrol lists load without blocking the map on very large organisations.
+
+## Bug fixes
+
+- Android devices (including Honor / MagicUI) behave better when the keyboard opens—fields stay visible and scrolling feels natural.
+- Splash and loading states no longer stick on a white screen while authentication initialises.
+- Build and runtime issues resolved for current Expo, Hermes, and Clerk combinations.
+- Default access is **unlocked** for patrol configuration unless your organisation intentionally enforces stricter rules offline.
+
+## Removed
+
+- The old **field grant / permission gate** (extra tabs, overlays, and background checks) is gone—patrol staff can work without that layer.
+- **Always-on idle GPS tracking** is removed to protect battery; location use is tied to meaningful patrol workflows instead of continuous background polling.

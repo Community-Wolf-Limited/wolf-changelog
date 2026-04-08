@@ -1,0 +1,22 @@
+---
+title: "Scheduled exports: reliable analytics PDFs, correct filters, and honest date ranges"
+description: "Automated export emails attach analytics summaries when expected, respect site filters, avoid corrupting shared settings between steps, and label PDFs with the same window as the data."
+date: "2026-04-08"
+tags: ["Bug Fix", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's new
+
+- **Smarter lookups**: When tabular data is sparse, supporting lookups still fill in human-readable site and staff names in PDF headers.
+
+## Improvements
+
+- PDF cover dates now match the actual query window used for the underlying data.
+- Patrol-related site filters resolve through the correct relationships so exports are not silently “all sites”.
+
+## Bug fixes
+
+- Analytics PDFs are always attempted when the job expects them; a PDF failure no longer prevents the main data attachment from sending.
+- Timezone-sensitive scheduling uses a more reliable clock API for hour boundaries.
+- Fixed accidental mutation of export settings between chained steps, which could widen or narrow filters incorrectly.

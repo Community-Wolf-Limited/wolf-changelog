@@ -1,0 +1,30 @@
+---
+title: "Safety Router: partner scopes, org-aware operations, and traces without Grafana-as-product"
+description: "API keys can express feature scope, operators get org-scoped metrics and logs, traces export to standard backends, and the earlier Grafana-in-compose experiment is retired in favour of slimmer observability."
+date: "2026-04-08"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's new
+
+- **Scoped capabilities**: Partner keys can enable or disable feature families; missing scope returns a clear denial instead of ambiguous errors.
+- **Organisation context**: Platform operators see directory information, can adjust org metadata, and get per-org counters and log streams suited to support workflows.
+- **Tracing**: Request spans can be exported to a standard trace backend for operators who wire it up.
+- **Safer operations**: Containers run without root; deployments follow a staged, memory-aware recipe; a small CLI helps smoke-test health and scoring after releases.
+
+## Improvements
+
+- **Observability without the LGTM experiment**: Metrics, logs, and summarized trace data remain first-class; the bundled **Grafana** service and dashboards from the short-lived LGTM-style experiment were **removed**. Prometheus-compatible metrics and log/trace pipelines remain where operators need them.
+- Batch and payload limits on scoring endpoints reduce accidental overload.
+- Corridor-style routing fills in tier detail even for degenerate origin/destination cases.
+
+## Bug fixes
+
+- Browser clients on localhost are less likely to hit CORS pitfalls during early onboarding.
+- Mongo connection lifecycle closes cleanly on shutdown.
+- Origin validation is stricter; TLS/site configuration docs and scripts help avoid wrong certificates on shared hosts.
+
+## Removed
+
+- **Grafana** as a packaged dependency of the default compose story (part of the abandoned LGTM product experiment); other telemetry components may still be used by operators directly.

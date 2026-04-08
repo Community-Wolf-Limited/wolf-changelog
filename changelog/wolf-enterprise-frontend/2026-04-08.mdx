@@ -1,0 +1,34 @@
+---
+title: "Enterprise dashboard: Pathfinder lab, bulk patrol tools, time zones, and cleaner maps"
+description: "Admins get an API exploration lab, faster bulk edits on patrol data, first-class time zones on schedules, tighter map behaviour, and removal of the legacy field-access console."
+date: "2026-04-08"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's new
+
+- **Pathfinder lab**: Admins can explore hex scoring, routes, and map-driven workflows in one place—with sensible regional defaults and copy-friendly results.
+- **Bulk patrol edits**: Change many assignments, schedules, or routes at once with confirmations and clear feedback.
+- **Time zones everywhere**: Schedules and export flows use a shared, searchable time-zone control with live reference clocks.
+- **Tables that scale**: Resize columns and show or hide them without losing your layout between visits.
+
+## Improvements
+
+- Live map layers build national summaries only after data is fully loaded, reducing gaps at high zoom.
+- Map vendor telemetry is reduced for snappier performance.
+- After deployments, heavy screens retry loading chunks instead of failing silently.
+- Opt-out analysis and remarketing areas were refactored for clearer filters and more reliable exports.
+- Reference documentation for device-oriented patrol events was added for integrators.
+
+## Bug fixes
+
+- Assignment toggles send the right organisation context and use the correct update style for “active only” changes.
+- Calls to external path services no longer attach the wrong credential type.
+- Relative time labels no longer crash on malformed dates.
+- Socket-driven views refresh predictably when feeds reconnect.
+
+## Removed
+
+- The **patrol field access** admin experience (dedicated page, live map, and related exports) has been removed as product direction shifted.
+- Column visibility for patrol events is handled locally per table instead of a shared global store.

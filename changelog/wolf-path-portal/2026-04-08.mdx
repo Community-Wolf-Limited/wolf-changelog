@@ -1,0 +1,27 @@
+---
+title: "Partner portal: guided integration, playground, and clearer operations"
+description: "A step-by-step integration experience, an interactive API playground with maps, stronger org and role handling, and observability views—without relying on a separate Grafana experiment."
+date: "2026-04-08"
+tags: ["Feature", "Enhancement", "Enterprise"]
+version: "1.0"
+---
+
+## What's new
+
+- **Guided setup**: A short, ordered wizard walks partners from creating a key through their first successful call and map integration, instead of a long flat docs page.
+- **Try it live**: An in-browser playground lets partners build requests, see responses, and pick hexes on a map— including handing off a newly created key automatically.
+- **Keys at a glance**: Filter keys by lifecycle state (active, rotating, inactive) so large teams can see what needs attention.
+- **Who can do what**: Members and admins see the right navigation; sensitive areas stay behind admin access.
+- **Org clarity**: Organisation names resolve consistently in the switcher, and platform-admin flows handle reassignment without confusing conflicts.
+
+## Improvements
+
+- **Observability in the product**: Logs, traces, and summarized operational views live in the portal. Earlier experiments with embedding a full Grafana-style stack were **removed** in favour of these first-party views and metrics.
+- **Marketing home**: A richer landing experience for the portal with motion and visual polish.
+- **Stability**: Fewer hydration and auth edge cases in settings and the playground; CI and tests tightened.
+
+## Bug fixes
+
+- Fixed cases where organisation labels appeared as opaque ids instead of readable names.
+- Addressed playground authentication and key-format hints so failed calls are easier to diagnose.
+- Settings deep links and form semantics improved for accessibility and routing.

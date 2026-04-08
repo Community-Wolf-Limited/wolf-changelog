@@ -1,0 +1,22 @@
+---
+title: "Community map & reports: sharper hex coverage and in-app exports"
+description: "Reports can be exported from the browser, table and filter layouts are clearer, and crime hex rendering matches enterprise behaviour on wide screens and high zoom."
+date: "2026-04-08"
+tags: ["Feature", "Enhancement", "Pro"]
+version: "1.0"
+---
+
+## What's new
+
+- **Export from reports**: Download report data in common formats when you are signed in, with clear errors if something blocks the download.
+- **Easier scanning**: Columns, filters, and date headers are structured so long reports are easier to read and sort.
+
+## Improvements
+
+- Hex resolution now follows the visible map area more intelligently, aligning with the enterprise map and avoiding artificial caps that left holes on wide viewports.
+- National overlays are built after the full dataset is ready, so tiles do not appear “patchy” while loading.
+- Partner integrations that need scoped keys for map scoring are supported without exposing internal wiring.
+
+## Bug fixes
+
+- Fixed visible gaps in crime hex coverage on large monitors at high zoom.
