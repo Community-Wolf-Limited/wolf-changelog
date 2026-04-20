@@ -1,13 +1,21 @@
 import type { Metadata, Viewport } from "next"
+import { Barlow } from "next/font/google"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { ThemeProvider } from "@/components/theme-provider"
 import { siteConfig } from "@/lib/site"
 import "./globals.css"
 
+// Wolf display font — Barlow 600/700 for headings. Self-hosted via next/font.
+const barlow = Barlow({
+  variable: "--font-barlow",
+  subsets: ["latin"],
+  weight: ["600", "700"],
+})
+
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
   ],
 }
@@ -29,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable} antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${barlow.variable} antialiased`}
       suppressHydrationWarning
     >
       <body>
