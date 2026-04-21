@@ -31,7 +31,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                 aria-label="Community Wolf home"
                 className="hover:opacity-80 transition-opacity"
               >
-                <WolfIcon size={28} className="text-primary" />
+                <WolfIcon size={28} className="text-foreground" />
               </Link>
               <h1 className="text-xl font-semibold tracking-tight">Changelog</h1>
             </div>
